@@ -7,10 +7,23 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(204).end();
 
-  // GET /api/todos?date=YYYY-MM-DD
+  // GET /api/todos?date=YYYY-MM-DD  → todos for one day
+  // GET /api/todos?month=YYYY-MM   → { [date]: todo[] } for whole month
   if (req.method === "GET") {
-    const { date } = req.query;
-    if (!date) return res.status(400).json({ error: "date required" });
+    const { date, month } = req.query;
+    if (month) {
+      const rows = await sql`
+        SELECT date::text, id, text, done, position, start_hour, end_hour, block_id
+        FROM day_todos WHERE to_char(date, 'YYYY-MM') = ${month} ORDER BY date, position, id
+      `;
+      const result = {};
+      for (const row of rows) {
+        if (!result[row.date]) result[row.date] = [];
+        result[row.date].push({ id: row.id, text: row.text, done: row.done, position: row.position, start_hour: row.start_hour, end_hour: row.end_hour, block_id: row.block_id });
+      }
+      return res.status(200).json(result);
+    }
+    if (!date) return res.status(400).json({ error: "date or month required" });
     const rows = await sql`
       SELECT id, text, done, position, start_hour, end_hour, block_id
       FROM day_todos WHERE date = ${date} ORDER BY position, id

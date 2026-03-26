@@ -295,6 +295,7 @@ export default function LifestylePlan() {
 
   // Calendar hover preview
   const [calHoverDay, setCalHoverDay] = useState(null);
+  const [calMonthTodos, setCalMonthTodos] = useState({}); // { [date]: todo[] }
 
   // Habits
   const HABIT_DEFAULTS = ["Gym / Train", "Read", "Cook / Meal Prep", "No Junk Spend", "Network", "Journal"];
@@ -358,7 +359,7 @@ export default function LifestylePlan() {
     }
   }, [plannerMode]);
 
-  // Prefetch all tasks for the visible calendar month so hover previews have data
+  // Prefetch all tasks + todos for the visible calendar month so hover previews have data
   useEffect(() => {
     if (view !== "planner" || plannerMode !== "calendar") return;
     const monthStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}`;
@@ -371,6 +372,13 @@ export default function LifestylePlan() {
           saveCache(merged);
           return merged;
         });
+      })
+      .catch(() => {});
+    fetch(`/api/todos?month=${monthStr}`)
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data !== "object" || Array.isArray(data)) return;
+        setCalMonthTodos(data);
       })
       .catch(() => {});
   }, [calYear, calMonth, plannerMode, view]);
@@ -1497,6 +1505,10 @@ export default function LifestylePlan() {
           font-size: 11px; color: rgba(240,237,230,0.25);
           font-style: italic;
         }
+        .cal-preview-done {
+          text-decoration: line-through;
+          opacity: 0.4;
+        }
 
         .cal-day.past .cal-day-num {
           text-decoration: line-through;
@@ -2166,7 +2178,7 @@ export default function LifestylePlan() {
                       const isToday = iso === today;
                       const isPast = iso < today;
                       const isSelected = iso === plannerDate;
-                      const hasTasks = Object.values(tasks[iso] || {}).some(arr => arr.length > 0);
+                      const hasTasks = Object.values(tasks[iso] || {}).some(arr => arr.length > 0) || (calMonthTodos[iso]?.length > 0);
                       const dayNum = parseInt(iso.split("-")[2], 10);
                       const [dy, dm, dd] = iso.split("-").map(Number);
                       const dow = new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay();
@@ -2189,12 +2201,21 @@ export default function LifestylePlan() {
                           {calHoverDay === iso && (
                             <div className={`cal-day-preview cal-day-preview--${tipAlign}`}>
                               <div className="cal-preview-date">{formatDateLabel(iso)}</div>
-                              {previewTasks.length > 0 ? previewTasks.map(({ hour, items }) => (
+                              {previewTasks.map(({ hour, items }) => (
                                 <div key={hour} className="cal-preview-row">
                                   <span className="cal-preview-hour">{formatHour(hour)}</span>
                                   <span className="cal-preview-items">{items.join(", ")}</span>
                                 </div>
-                              )) : (
+                              ))}
+                              {(calMonthTodos[iso] || []).map(t => (
+                                <div key={t.id} className="cal-preview-row">
+                                  <span className="cal-preview-hour" style={{opacity: t.start_hour != null ? 1 : 0.4}}>
+                                    {t.start_hour != null ? formatHour(Number(t.start_hour)) : "—"}
+                                  </span>
+                                  <span className={`cal-preview-items${t.done ? " cal-preview-done" : ""}`}>{t.text}</span>
+                                </div>
+                              ))}
+                              {previewTasks.length === 0 && !calMonthTodos[iso]?.length && (
                                 <div className="cal-preview-empty">Nothing planned</div>
                               )}
                             </div>
