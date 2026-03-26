@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
+const DayMap = lazy(() => import("./DayMap"));
 
 const months = [
   {
@@ -240,6 +241,7 @@ export default function LifestylePlan() {
   const today = todayISO();
   const [plannerMode, setPlannerMode] = useState("calendar"); // "calendar" | "day"
   const [plannerDate, setPlannerDate] = useState(today);
+  const [dayTab, setDayTab] = useState("schedule"); // "schedule" | "map"
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [tasks, setTasks] = useState(loadCache);
@@ -250,6 +252,9 @@ export default function LifestylePlan() {
   const [editingValue, setEditingValue] = useState("");
 
   const gridRef = useRef(null);
+
+  // Reset tab when switching days
+  useEffect(() => { setDayTab("schedule"); }, [plannerDate]);
 
   // Load from DB when entering day view
   useEffect(() => {
@@ -1018,6 +1023,38 @@ export default function LifestylePlan() {
 
         .cal-day-empty { cursor: default; }
 
+        .day-tab-bar {
+          display: flex;
+          gap: 2px;
+          background: rgba(44,31,20,0.07);
+          border-radius: 8px;
+          padding: 3px;
+          margin-top: 10px;
+        }
+
+        .day-tab-btn {
+          background: none;
+          border: none;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          color: rgba(44,31,20,0.4);
+          cursor: pointer;
+          padding: 5px 14px;
+          border-radius: 6px;
+          transition: all 0.15s;
+        }
+
+        .day-tab-btn:hover { color: rgba(44,31,20,0.7); }
+
+        .day-tab-btn.active {
+          background: #FFFBF7;
+          color: #2C1F14;
+          box-shadow: 0 1px 3px rgba(44,31,20,0.1);
+        }
+
         .day-back-btn {
           background: none;
           border: none;
@@ -1180,11 +1217,21 @@ export default function LifestylePlan() {
               <div className="planner-task-count">
                 {syncing ? "syncing…" : totalTaskCount === 0 ? "Nothing planned" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
               </div>
+              <div className="day-tab-bar">
+                <button className={`day-tab-btn${dayTab === "schedule" ? " active" : ""}`} onClick={() => setDayTab("schedule")}>Schedule</button>
+                <button className={`day-tab-btn${dayTab === "map" ? " active" : ""}`} onClick={() => setDayTab("map")}>Map</button>
+              </div>
             </div>
             <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, 1))}>→</button>
           </div>
 
-          <div className="planner-time-grid" ref={gridRef}>
+          {dayTab === "map" ? (
+            <Suspense fallback={<div style={{padding:"40px 40px",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(44,31,20,0.3)",letterSpacing:2,textTransform:"uppercase"}}>Loading map…</div>}>
+              <DayMap date={plannerDate} />
+            </Suspense>
+          ) : null}
+
+          <div className="planner-time-grid" ref={gridRef} style={{display: dayTab === "map" ? "none" : undefined}}>
             {[
               { label: "Morning",   hours: HOURS.filter(h => h < 12) },
               { label: "Afternoon", hours: HOURS.filter(h => h >= 12 && h < 18) },
