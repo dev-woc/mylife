@@ -293,6 +293,14 @@ export default function LifestylePlan() {
   const [editingTodoTime, setEditingTodoTime] = useState(null); // id
   const [todoTimeForm, setTodoTimeForm] = useState({ start_hour: 9, end_hour: 10 });
 
+  // Habits
+  const HABIT_DEFAULTS = ["Gym / Train", "Read", "Cook / Meal Prep", "No Junk Spend", "Network", "Journal"];
+  const [habits, setHabits] = useState([]); // [{ label, done }]
+
+  // Notes
+  const [noteText, setNoteText] = useState("");
+  const noteSaveTimer = useRef(null);
+
   const gridRef = useRef(null);
 
   // Reset + reload day data when date changes
@@ -303,6 +311,17 @@ export default function LifestylePlan() {
     setTaskLinks([]);
     setLinkingTask(null);
     setTodos([]);
+    setHabits([]);
+    setNoteText("");
+    fetch(`/api/habits?date=${plannerDate}`)
+      .then(r => r.json()).then(rows => {
+        if (!Array.isArray(rows)) return;
+        // Merge DB state with defaults (defaults first, DB values override done)
+        const dbMap = Object.fromEntries(rows.map(r => [r.label, r.done]));
+        setHabits(HABIT_DEFAULTS.map(label => ({ label, done: dbMap[label] ?? false })));
+      }).catch(() => setHabits(HABIT_DEFAULTS.map(label => ({ label, done: false }))));
+    fetch(`/api/notes?date=${plannerDate}`)
+      .then(r => r.json()).then(d => setNoteText(d.text ?? "")).catch(() => {});
     fetch(`/api/blocks?date=${plannerDate}`)
       .then(r => r.json()).then(d => setBlocks(Array.isArray(d) ? d.map(b => ({ ...b, start_hour: Number(b.start_hour), end_hour: Number(b.end_hour) })) : [])).catch(() => {});
     fetch(`/api/stops?date=${plannerDate}`)
@@ -646,6 +665,22 @@ export default function LifestylePlan() {
     await fetch("/api/todos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, start_hour: null, end_hour: null, block_id: null }) });
     setTodos(prev => prev.map(t => t.id === id ? { ...t, start_hour: null, end_hour: null, block_id: null } : t));
     setEditingTodoTime(null);
+  }
+
+  function toggleHabit(label) {
+    const current = habits.find(h => h.label === label);
+    if (!current) return;
+    const done = !current.done;
+    setHabits(prev => prev.map(h => h.label === label ? { ...h, done } : h));
+    fetch("/api/habits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: plannerDate, label, done }) }).catch(() => {});
+  }
+
+  function handleNoteChange(text) {
+    setNoteText(text);
+    clearTimeout(noteSaveTimer.current);
+    noteSaveTimer.current = setTimeout(() => {
+      fetch("/api/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: plannerDate, text }) }).catch(() => {});
+    }, 800);
   }
 
   const dayTasks = tasks[plannerDate] || {};
@@ -1683,6 +1718,69 @@ export default function LifestylePlan() {
         }
         .todo-time-clear:hover { color: #C0392B; }
 
+        /* Today button */
+        .cal-today-btn {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+          color: rgba(240,237,230,0.4);
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 20px; padding: 3px 12px; cursor: pointer;
+          transition: all 0.15s;
+        }
+        .cal-today-btn:hover { color: #FFD700; border-color: rgba(255,215,0,0.4); background: rgba(255,215,0,0.06); }
+
+        /* Habit tracker */
+        .habit-section {
+          border-top: 1px solid rgba(44,31,20,0.08);
+          padding: 14px 0 4px;
+        }
+        .habit-section-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+          color: rgba(44,31,20,0.35);
+          margin-bottom: 10px;
+        }
+        .habit-grid {
+          display: flex; flex-wrap: wrap; gap: 6px;
+        }
+        .habit-chip {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px; font-weight: 500;
+          color: rgba(44,31,20,0.5);
+          background: rgba(44,31,20,0.05);
+          border: 1px solid rgba(44,31,20,0.12);
+          border-radius: 20px; padding: 4px 10px;
+          cursor: pointer; transition: all 0.15s;
+          white-space: nowrap;
+        }
+        .habit-chip:hover { border-color: rgba(44,31,20,0.25); color: rgba(44,31,20,0.7); }
+        .habit-chip.done {
+          background: rgba(74,160,44,0.12);
+          border-color: rgba(74,160,44,0.35);
+          color: #3a7d2a;
+          font-weight: 600;
+        }
+
+        /* Day notes */
+        .notes-section {
+          border-top: 1px solid rgba(44,31,20,0.08);
+          padding: 14px 0 0;
+        }
+        .notes-textarea {
+          width: 100%; min-height: 90px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 12px; color: rgba(44,31,20,0.7);
+          background: rgba(44,31,20,0.03);
+          border: 1px solid rgba(44,31,20,0.1);
+          border-radius: 8px; padding: 10px 12px;
+          resize: vertical; outline: none;
+          line-height: 1.6;
+          transition: border-color 0.15s;
+        }
+        .notes-textarea::placeholder { color: rgba(44,31,20,0.25); }
+        .notes-textarea:focus { border-color: rgba(44,31,20,0.25); }
+
         @media (max-width: 768px) {
           .day-body { flex-direction: column; }
           .todo-panel {
@@ -1979,7 +2077,12 @@ export default function LifestylePlan() {
               if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
               else setCalMonth(m => m - 1);
             }}>←</button>
-            <div className="cal-month-label">{MONTH_NAMES[calMonth]} {calYear}</div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+              <div className="cal-month-label">{MONTH_NAMES[calMonth]} {calYear}</div>
+              {!(calYear === new Date().getFullYear() && calMonth === new Date().getMonth()) && (
+                <button className="cal-today-btn" onClick={() => { setCalYear(new Date().getFullYear()); setCalMonth(new Date().getMonth()); }}>Today</button>
+              )}
+            </div>
             <button className="cal-nav-btn" onClick={() => {
               if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
               else setCalMonth(m => m + 1);
@@ -2074,6 +2177,9 @@ export default function LifestylePlan() {
               <div className="planner-date-center">
                 <button className="day-back-btn" onClick={() => setPlannerMode("calendar")}>← Calendar</button>
                 <div className="planner-date-label" style={{marginTop: 4}}>{formatDateLabel(plannerDate)}</div>
+                {plannerDate !== today && (
+                  <button className="cal-today-btn" style={{marginTop:4}} onClick={() => setPlannerDate(today)}>Today</button>
+                )}
                 <div className="planner-task-count">
                   {syncing ? "syncing…" : totalTaskCount === 0 ? "Nothing planned" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
                 </div>
@@ -2422,6 +2528,31 @@ export default function LifestylePlan() {
                       setTodoInput("");
                     }
                   }}
+                />
+              </div>
+
+              <div className="habit-section">
+                <div className="habit-section-label">Daily Habits</div>
+                <div className="habit-grid">
+                  {habits.map(h => (
+                    <button
+                      key={h.label}
+                      className={`habit-chip${h.done ? " done" : ""}`}
+                      onClick={() => toggleHabit(h.label)}
+                    >
+                      {h.done ? "✓ " : ""}{h.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="notes-section">
+                <div className="habit-section-label">Day Notes</div>
+                <textarea
+                  className="notes-textarea"
+                  placeholder="Thoughts, reflections, anything…"
+                  value={noteText}
+                  onChange={e => handleNoteChange(e.target.value)}
                 />
               </div>
             </div>
