@@ -188,12 +188,31 @@ function formatDateLabel(iso) {
   });
 }
 
-function loadTasks() {
+function loadCache() {
   try {
     return JSON.parse(localStorage.getItem("dayplanner-tasks")) || {};
   } catch {
     return {};
   }
+}
+
+function saveCache(data) {
+  localStorage.setItem("dayplanner-tasks", JSON.stringify(data));
+}
+
+async function fetchDayFromDB(date) {
+  const res = await fetch(`/api/tasks?date=${date}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data[date] || {};
+}
+
+async function persistSlotToDB(date, hour, taskList) {
+  await fetch("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ date, hour, tasks: taskList }),
+  });
 }
 
 export default function LifestylePlan() {
@@ -202,7 +221,8 @@ export default function LifestylePlan() {
 
   // Day planner state
   const [plannerDate, setPlannerDate] = useState(todayISO);
-  const [tasks, setTasks] = useState(loadTasks);
+  const [tasks, setTasks] = useState(loadCache);
+  const [syncing, setSyncing] = useState(false);
   const [addingSlot, setAddingSlot] = useState(null); // { date, hour }
   const [addingValue, setAddingValue] = useState("");
   const [editingSlot, setEditingSlot] = useState(null); // { date, hour, index }
@@ -210,9 +230,24 @@ export default function LifestylePlan() {
 
   const gridRef = useRef(null);
 
+  // Load from DB whenever the date changes (planner view)
+  useEffect(() => {
+    if (view !== "planner") return;
+    setSyncing(true);
+    fetchDayFromDB(plannerDate).then((dayData) => {
+      if (dayData) {
+        setTasks((prev) => {
+          const merged = { ...prev, [plannerDate]: dayData };
+          saveCache(merged);
+          return merged;
+        });
+      }
+      setSyncing(false);
+    }).catch(() => setSyncing(false));
+  }, [plannerDate, view]);
+
   useEffect(() => {
     if (view === "planner" && gridRef.current) {
-      // Scroll to 8am (index 2 from 6am start)
       const rows = gridRef.current.querySelectorAll(".time-row");
       if (rows[2]) rows[2].scrollIntoView({ block: "start" });
     }
@@ -220,9 +255,11 @@ export default function LifestylePlan() {
 
   const selected = months.find((m) => m.id === active);
 
-  function saveTasks(updated) {
+  // Update local state + cache, then persist the changed slot to DB
+  function saveTasks(updated, date, hour, slotTasks) {
     setTasks(updated);
-    localStorage.setItem("dayplanner-tasks", JSON.stringify(updated));
+    saveCache(updated);
+    persistSlotToDB(date, hour, slotTasks);
   }
 
   function getSlotTasks(date, hour) {
@@ -234,31 +271,43 @@ export default function LifestylePlan() {
     if (!trimmed) return;
     const updated = { ...tasks };
     if (!updated[date]) updated[date] = {};
-    updated[date][hour] = [...(updated[date][hour] || []), trimmed];
-    saveTasks(updated);
+    const newList = [...(updated[date][hour] || []), trimmed];
+    updated[date][hour] = newList;
+    saveTasks(updated, date, hour, newList);
   }
 
   function editTask(date, hour, index, value) {
     const trimmed = value.trim();
     const updated = { ...tasks };
     if (!updated[date]?.[hour]) return;
+    let newList;
     if (!trimmed) {
-      updated[date][hour] = updated[date][hour].filter((_, i) => i !== index);
-      if (updated[date][hour].length === 0) delete updated[date][hour];
-      if (Object.keys(updated[date]).length === 0) delete updated[date];
+      newList = updated[date][hour].filter((_, i) => i !== index);
+      if (newList.length === 0) {
+        delete updated[date][hour];
+        if (Object.keys(updated[date]).length === 0) delete updated[date];
+        newList = [];
+      } else {
+        updated[date][hour] = newList;
+      }
     } else {
-      updated[date][hour] = updated[date][hour].map((t, i) => i === index ? trimmed : t);
+      newList = updated[date][hour].map((t, i) => i === index ? trimmed : t);
+      updated[date][hour] = newList;
     }
-    saveTasks(updated);
+    saveTasks(updated, date, hour, newList);
   }
 
   function deleteTask(date, hour, index) {
     const updated = { ...tasks };
     if (!updated[date]?.[hour]) return;
-    updated[date][hour] = updated[date][hour].filter((_, i) => i !== index);
-    if (updated[date][hour].length === 0) delete updated[date][hour];
-    if (Object.keys(updated[date] || {}).length === 0) delete updated[date];
-    saveTasks(updated);
+    const newList = updated[date][hour].filter((_, i) => i !== index);
+    if (newList.length === 0) {
+      delete updated[date][hour];
+      if (Object.keys(updated[date] || {}).length === 0) delete updated[date];
+    } else {
+      updated[date][hour] = newList;
+    }
+    saveTasks(updated, date, hour, newList);
   }
 
   function commitAdd() {
@@ -888,7 +937,7 @@ export default function LifestylePlan() {
             <div className="planner-date-center">
               <div className="planner-date-label">{formatDateLabel(plannerDate)}</div>
               <div className="planner-task-count">
-                {totalTaskCount === 0 ? "No tasks yet" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
+                {syncing ? "syncing..." : totalTaskCount === 0 ? "No tasks yet" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
               </div>
             </div>
             <button
