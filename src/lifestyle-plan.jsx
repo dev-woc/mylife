@@ -251,10 +251,26 @@ export default function LifestylePlan() {
   const [editingSlot, setEditingSlot] = useState(null);
   const [editingValue, setEditingValue] = useState("");
 
+  // Merged blocks
+  const [blocks, setBlocks] = useState([]);
+  const [showBlockForm, setShowBlockForm] = useState(false);
+  const [blockForm, setBlockForm] = useState({ label: "", start_hour: 9, end_hour: 17 });
+  const [blockAddingId, setBlockAddingId] = useState(null);
+  const [blockAddingValue, setBlockAddingValue] = useState("");
+  const [blockEditingSlot, setBlockEditingSlot] = useState(null); // { blockId, index }
+  const [blockEditingValue, setBlockEditingValue] = useState("");
+
   const gridRef = useRef(null);
 
-  // Reset tab when switching days
-  useEffect(() => { setDayTab("schedule"); }, [plannerDate]);
+  // Reset tab + blocks when switching days
+  useEffect(() => {
+    setDayTab("schedule");
+    setBlocks([]);
+    fetch(`/api/blocks?date=${plannerDate}`)
+      .then(r => r.json())
+      .then(data => setBlocks(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [plannerDate]);
 
   // Load from DB when entering day view
   useEffect(() => {
@@ -350,6 +366,61 @@ export default function LifestylePlan() {
     }
     setEditingSlot(null);
     setEditingValue("");
+  }
+
+  async function createBlock() {
+    const { label, start_hour, end_hour } = blockForm;
+    if (start_hour >= end_hour) return;
+    const res = await fetch("/api/blocks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: plannerDate, start_hour, end_hour, label }),
+    });
+    const block = await res.json();
+    setBlocks(prev => [...prev, { ...block, tasks: block.tasks || [] }].sort((a, b) => a.start_hour - b.start_hour));
+    setShowBlockForm(false);
+    setBlockForm({ label: "", start_hour: 9, end_hour: 17 });
+  }
+
+  async function deleteBlock(id) {
+    await fetch("/api/blocks", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setBlocks(prev => prev.filter(b => b.id !== id));
+  }
+
+  async function updateBlockTasks(id, newTasks) {
+    setBlocks(prev => prev.map(b => b.id === id ? { ...b, tasks: newTasks } : b));
+    await fetch("/api/blocks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, tasks: newTasks }),
+    });
+  }
+
+  function commitBlockAdd() {
+    if (!blockAddingId || !blockAddingValue.trim()) { setBlockAddingId(null); setBlockAddingValue(""); return; }
+    const block = blocks.find(b => b.id === blockAddingId);
+    if (block) updateBlockTasks(blockAddingId, [...block.tasks, blockAddingValue.trim()]);
+    setBlockAddingId(null);
+    setBlockAddingValue("");
+  }
+
+  function commitBlockEdit() {
+    if (!blockEditingSlot) { setBlockEditingSlot(null); setBlockEditingValue(""); return; }
+    const { blockId, index } = blockEditingSlot;
+    const block = blocks.find(b => b.id === blockId);
+    if (block) {
+      const trimmed = blockEditingValue.trim();
+      const newTasks = trimmed
+        ? block.tasks.map((t, i) => i === index ? trimmed : t)
+        : block.tasks.filter((_, i) => i !== index);
+      updateBlockTasks(blockId, newTasks);
+    }
+    setBlockEditingSlot(null);
+    setBlockEditingValue("");
   }
 
   const dayTasks = tasks[plannerDate] || {};
@@ -1057,6 +1128,170 @@ export default function LifestylePlan() {
           border-bottom-color: #C0733A;
         }
 
+        /* Merged blocks */
+        .block-card {
+          margin: 4px 40px 4px;
+          background: #FFFBF7;
+          border: 1px solid rgba(44,31,20,0.1);
+          border-left: 3px solid #C0733A;
+          border-radius: 10px;
+          padding: 16px 18px;
+          box-shadow: 0 2px 8px rgba(44,31,20,0.07);
+        }
+
+        .block-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          margin-bottom: 12px;
+        }
+
+        .block-title-group {}
+
+        .block-label {
+          font-family: 'Playfair Display', serif;
+          font-size: 18px;
+          font-weight: 700;
+          color: #2C1F14;
+          line-height: 1.2;
+        }
+
+        .block-range {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: #C0733A;
+          margin-top: 3px;
+        }
+
+        .block-delete-btn {
+          background: none;
+          border: none;
+          color: rgba(44,31,20,0.2);
+          font-size: 18px;
+          cursor: pointer;
+          padding: 0 4px;
+          line-height: 1;
+          transition: color 0.1s;
+          flex-shrink: 0;
+        }
+
+        .block-delete-btn:hover { color: #C0392B; }
+
+        .block-tasks {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: flex-start;
+        }
+
+        .block-form-bar {
+          margin: 0 40px 4px;
+          background: #FFFBF7;
+          border: 1px dashed rgba(44,31,20,0.15);
+          border-radius: 10px;
+          padding: 16px 18px;
+          display: flex;
+          gap: 10px;
+          align-items: flex-end;
+          flex-wrap: wrap;
+        }
+
+        .block-form-field {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .block-form-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 9px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: rgba(44,31,20,0.4);
+        }
+
+        .block-form-input {
+          background: #F5EEE6;
+          border: 1px solid rgba(44,31,20,0.12);
+          border-radius: 6px;
+          padding: 7px 10px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          color: #2C1F14;
+          outline: none;
+          transition: border-color 0.15s;
+        }
+
+        .block-form-input:focus { border-color: #C0733A; }
+
+        .block-form-select {
+          background: #F5EEE6;
+          border: 1px solid rgba(44,31,20,0.12);
+          border-radius: 6px;
+          padding: 7px 10px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          color: #2C1F14;
+          outline: none;
+          cursor: pointer;
+        }
+
+        .block-form-actions {
+          display: flex;
+          gap: 8px;
+          align-items: flex-end;
+        }
+
+        .block-create-btn {
+          background: #2C1F14;
+          color: #F5EEE6;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 16px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: opacity 0.15s;
+          white-space: nowrap;
+        }
+
+        .block-create-btn:hover { opacity: 0.8; }
+        .block-create-btn:disabled { opacity: 0.4; cursor: default; }
+
+        .block-cancel-btn {
+          background: none;
+          border: 1px solid rgba(44,31,20,0.15);
+          border-radius: 6px;
+          padding: 8px 12px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px;
+          color: rgba(44,31,20,0.5);
+          cursor: pointer;
+          transition: all 0.15s;
+          white-space: nowrap;
+        }
+
+        .block-cancel-btn:hover { border-color: rgba(44,31,20,0.3); color: rgba(44,31,20,0.75); }
+
+        .add-block-btn {
+          background: none;
+          border: none;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          letter-spacing: 2.5px;
+          text-transform: uppercase;
+          color: rgba(44,31,20,0.3);
+          cursor: pointer;
+          padding: 0;
+          transition: color 0.15s;
+        }
+
+        .add-block-btn:hover { color: rgba(44,31,20,0.65); }
+
         .day-back-btn {
           background: none;
           border: none;
@@ -1226,6 +1461,11 @@ export default function LifestylePlan() {
             <div className="day-tab-bar">
               <button className={`day-tab-btn${dayTab === "schedule" ? " active" : ""}`} onClick={() => setDayTab("schedule")}>Schedule</button>
               <button className={`day-tab-btn${dayTab === "map" ? " active" : ""}`} onClick={() => setDayTab("map")}>Map</button>
+              {dayTab === "schedule" && (
+                <button className="add-block-btn" style={{marginLeft: "auto"}} onClick={() => { setShowBlockForm(f => !f); }}>
+                  {showBlockForm ? "Cancel" : "+ Merge Block"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1236,103 +1476,186 @@ export default function LifestylePlan() {
           ) : null}
 
           <div className="planner-time-grid" ref={gridRef} style={{display: dayTab === "map" ? "none" : undefined}}>
-            {[
-              { label: "Morning",   hours: HOURS.filter(h => h < 12) },
-              { label: "Afternoon", hours: HOURS.filter(h => h >= 12 && h < 18) },
-              { label: "Evening",   hours: HOURS.filter(h => h >= 18) },
-            ].map(({ label, hours }) => (
-              <div key={label} className="day-section">
-                <div className="day-section-header">
-                  <span className="day-section-label">{label}</span>
-                  <div className="day-section-rule" />
+            {showBlockForm && (
+              <div className="block-form-bar">
+                <div className="block-form-field">
+                  <span className="block-form-label">Label</span>
+                  <input
+                    autoFocus
+                    className="block-form-input"
+                    placeholder="e.g. Work"
+                    value={blockForm.label}
+                    onChange={e => setBlockForm(f => ({ ...f, label: e.target.value }))}
+                    onKeyDown={e => { if (e.key === "Enter") createBlock(); if (e.key === "Escape") setShowBlockForm(false); }}
+                    style={{ width: 120 }}
+                  />
                 </div>
-                {hours.map((hour) => {
-                  const slotTasks = getSlotTasks(plannerDate, hour);
-                  const isAdding = addingSlot?.date === plannerDate && addingSlot?.hour === hour;
-                  const hasTasks = slotTasks.length > 0;
-
-                  return (
-                    <div key={hour} className={`time-row${hasTasks ? " has-tasks" : ""}`}>
-                      <div className="time-label">{formatHour(hour)}</div>
-                      <div className="time-divider" />
-                      <div className="task-area">
-                        {slotTasks.map((task, idx) => {
-                          const isEditing =
-                            editingSlot?.date === plannerDate &&
-                            editingSlot?.hour === hour &&
-                            editingSlot?.index === idx;
-
-                          if (isEditing) {
-                            return (
-                              <textarea
-                                key={idx}
-                                autoFocus
-                                className="task-inline-input"
-                                value={editingValue}
-                                rows={editingValue.split("\n").length || 1}
-                                onChange={e => setEditingValue(e.target.value)}
-                                onKeyDown={e => {
-                                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); }
-                                  if (e.key === "Escape") { setEditingSlot(null); setEditingValue(""); }
-                                }}
-                                onBlur={commitEdit}
-                              />
-                            );
-                          }
-
-                          return (
-                            <div
-                              key={idx}
-                              className="task-chip"
-                              onClick={() => {
-                                setAddingSlot(null);
-                                setEditingSlot({ date: plannerDate, hour, index: idx });
-                                setEditingValue(task);
-                              }}
-                            >
-                              <span className="task-chip-text">{task}</span>
-                              <span
-                                className="task-chip-delete"
-                                onMouseDown={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  deleteTask(plannerDate, hour, idx);
-                                }}
-                              >×</span>
-                            </div>
-                          );
-                        })}
-
-                        {isAdding ? (
-                          <textarea
-                            autoFocus
-                            className="task-inline-input"
-                            value={addingValue}
-                            rows={addingValue.split("\n").length || 1}
-                            onChange={e => setAddingValue(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); }
-                              if (e.key === "Escape") { setAddingSlot(null); setAddingValue(""); }
-                            }}
-                            onBlur={commitAdd}
-                            placeholder="Add task… (Shift+Enter for new line)"
-                          />
-                        ) : (
-                          <button
-                            className="task-add-btn"
-                            onClick={() => {
-                              setEditingSlot(null);
-                              setAddingSlot({ date: plannerDate, hour });
-                              setAddingValue("");
-                            }}
-                          >+ add</button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="block-form-field">
+                  <span className="block-form-label">From</span>
+                  <select className="block-form-select" value={blockForm.start_hour} onChange={e => setBlockForm(f => ({ ...f, start_hour: Number(e.target.value) }))}>
+                    {HOURS.map(h => <option key={h} value={h}>{formatHour(h)}</option>)}
+                  </select>
+                </div>
+                <div className="block-form-field">
+                  <span className="block-form-label">To</span>
+                  <select className="block-form-select" value={blockForm.end_hour} onChange={e => setBlockForm(f => ({ ...f, end_hour: Number(e.target.value) }))}>
+                    {HOURS.filter(h => h > blockForm.start_hour).map(h => <option key={h} value={h}>{formatHour(h)}</option>)}
+                  </select>
+                </div>
+                <div className="block-form-actions">
+                  <button className="block-create-btn" onClick={createBlock} disabled={blockForm.start_hour >= blockForm.end_hour}>Create</button>
+                  <button className="block-cancel-btn" onClick={() => setShowBlockForm(false)}>Cancel</button>
+                </div>
               </div>
-            ))}
+            )}
+
+            {(() => {
+              // Precompute which hours are covered by blocks
+              const coveredHours = new Set();
+              const blockByStart = {};
+              blocks.forEach(block => {
+                blockByStart[block.start_hour] = block;
+                for (let h = block.start_hour; h <= block.end_hour; h++) coveredHours.add(h);
+              });
+
+              const renderTaskArea = (taskList, onAdd, onAddValue, onAddChange, onAddCommit, onAddCancel, isAddingThis) => (
+                <div className="block-tasks">
+                  {taskList.map((task, idx) => {
+                    const isEditing = blockEditingSlot?.blockId === onAddCommit.blockId && blockEditingSlot?.index === idx;
+                    if (isEditing) {
+                      return (
+                        <textarea key={idx} autoFocus className="task-inline-input"
+                          value={blockEditingValue}
+                          rows={blockEditingValue.split("\n").length || 1}
+                          onChange={e => setBlockEditingValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitBlockEdit(); } if (e.key === "Escape") { setBlockEditingSlot(null); setBlockEditingValue(""); } }}
+                          onBlur={commitBlockEdit}
+                        />
+                      );
+                    }
+                    return (
+                      <div key={idx} className="task-chip"
+                        onClick={() => { setBlockEditingSlot({ blockId: onAddCommit.blockId, index: idx }); setBlockEditingValue(task); setBlockAddingId(null); }}
+                      >
+                        <span className="task-chip-text">{task}</span>
+                        <span className="task-chip-delete"
+                          onMouseDown={e => { e.preventDefault(); e.stopPropagation();
+                            const b = blocks.find(b => b.id === onAddCommit.blockId);
+                            if (b) updateBlockTasks(b.id, b.tasks.filter((_, i) => i !== idx));
+                          }}
+                        >×</span>
+                      </div>
+                    );
+                  })}
+                  {isAddingThis ? (
+                    <textarea autoFocus className="task-inline-input"
+                      value={onAddValue}
+                      rows={onAddValue.split("\n").length || 1}
+                      onChange={e => onAddChange(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onAddCommit(); } if (e.key === "Escape") onAddCancel(); }}
+                      onBlur={onAddCommit}
+                      placeholder="Add task… (Shift+Enter for new line)"
+                    />
+                  ) : (
+                    <button className="task-add-btn" onClick={onAdd}>+ add</button>
+                  )}
+                </div>
+              );
+
+              return [
+                { label: "Morning",   hours: HOURS.filter(h => h < 12) },
+                { label: "Afternoon", hours: HOURS.filter(h => h >= 12 && h < 18) },
+                { label: "Evening",   hours: HOURS.filter(h => h >= 18) },
+              ].map(({ label, hours }) => (
+                <div key={label} className="day-section">
+                  <div className="day-section-header">
+                    <span className="day-section-label">{label}</span>
+                    <div className="day-section-rule" />
+                  </div>
+                  {hours.map((hour) => {
+                    // Render block card at its start hour
+                    if (blockByStart[hour]) {
+                      const block = blockByStart[hour];
+                      const isAddingBlock = blockAddingId === block.id;
+                      return (
+                        <div key={hour} className="block-card">
+                          <div className="block-header">
+                            <div className="block-title-group">
+                              <div className="block-label">{block.label || "Block"}</div>
+                              <div className="block-range">{formatHour(block.start_hour)} → {formatHour(block.end_hour)}</div>
+                            </div>
+                            <button className="block-delete-btn" onClick={() => deleteBlock(block.id)}>×</button>
+                          </div>
+                          {renderTaskArea(
+                            block.tasks || [],
+                            () => { setBlockAddingId(block.id); setBlockAddingValue(""); setAddingSlot(null); },
+                            blockAddingValue,
+                            setBlockAddingValue,
+                            () => { commitBlockAdd(); },
+                            () => { setBlockAddingId(null); setBlockAddingValue(""); },
+                            isAddingBlock,
+                            { blockId: block.id }
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // Skip hours covered by a block (not the start)
+                    if (coveredHours.has(hour)) return null;
+
+                    // Normal time row
+                    const slotTasks = getSlotTasks(plannerDate, hour);
+                    const isAdding = addingSlot?.date === plannerDate && addingSlot?.hour === hour;
+                    const hasTasks = slotTasks.length > 0;
+
+                    return (
+                      <div key={hour} className={`time-row${hasTasks ? " has-tasks" : ""}`}>
+                        <div className="time-label">{formatHour(hour)}</div>
+                        <div className="time-divider" />
+                        <div className="task-area">
+                          {slotTasks.map((task, idx) => {
+                            const isEditing = editingSlot?.date === plannerDate && editingSlot?.hour === hour && editingSlot?.index === idx;
+                            if (isEditing) {
+                              return (
+                                <textarea key={idx} autoFocus className="task-inline-input"
+                                  value={editingValue} rows={editingValue.split("\n").length || 1}
+                                  onChange={e => setEditingValue(e.target.value)}
+                                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); } if (e.key === "Escape") { setEditingSlot(null); setEditingValue(""); } }}
+                                  onBlur={commitEdit}
+                                />
+                              );
+                            }
+                            return (
+                              <div key={idx} className="task-chip"
+                                onClick={() => { setAddingSlot(null); setEditingSlot({ date: plannerDate, hour, index: idx }); setEditingValue(task); }}
+                              >
+                                <span className="task-chip-text">{task}</span>
+                                <span className="task-chip-delete"
+                                  onMouseDown={e => { e.preventDefault(); e.stopPropagation(); deleteTask(plannerDate, hour, idx); }}
+                                >×</span>
+                              </div>
+                            );
+                          })}
+                          {isAdding ? (
+                            <textarea autoFocus className="task-inline-input"
+                              value={addingValue} rows={addingValue.split("\n").length || 1}
+                              onChange={e => setAddingValue(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); } if (e.key === "Escape") { setAddingSlot(null); setAddingValue(""); } }}
+                              onBlur={commitAdd}
+                              placeholder="Add task… (Shift+Enter for new line)"
+                            />
+                          ) : (
+                            <button className="task-add-btn"
+                              onClick={() => { setEditingSlot(null); setBlockAddingId(null); setAddingSlot({ date: plannerDate, hour }); setAddingValue(""); }}
+                            >+ add</button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
           </div>
         </div>
       )}
