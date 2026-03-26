@@ -1956,17 +1956,21 @@ export default function LifestylePlan() {
               <div className="block-form-bar">
                 <div className="block-form-field">
                   <span className="block-form-label">Task</span>
-                  <select
+                  <input
                     autoFocus
-                    className="block-form-select"
+                    list="block-task-suggestions"
+                    className="block-form-input"
+                    placeholder="New or existing task…"
                     value={blockForm.label}
                     onChange={e => setBlockForm(f => ({ ...f, label: e.target.value }))}
-                  >
-                    <option value="">Pick a task…</option>
+                    onKeyDown={e => { if (e.key === "Enter") createBlock(); if (e.key === "Escape") setShowBlockForm(false); }}
+                    style={{ width: 180 }}
+                  />
+                  <datalist id="block-task-suggestions">
                     {Object.values(dayTasks).flat().filter((t, i, a) => a.indexOf(t) === i).map(t => (
-                      <option key={t} value={t}>{t.length > 40 ? t.slice(0, 40) + "…" : t}</option>
+                      <option key={t} value={t} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div className="block-form-field">
                   <span className="block-form-label">From</span>
