@@ -357,17 +357,13 @@ export default function LifestylePlan() {
     const newList = [...(updated[date][hour] || []), trimmed];
     updated[date][hour] = newList;
     saveTasks(updated, date, hour, newList);
-    // Mirror to todo list (skip if already there)
-    if (date === plannerDate) {
-      setTodos(prev => {
-        if (prev.some(t => t.text === trimmed && Number(t.start_hour) === Number(hour))) return prev;
-        fetch("/api/todos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date, text: trimmed, start_hour: hour, end_hour: Number(hour) + 1 }),
-        }).then(r => r.json()).then(todo => setTodos(p => [...p, todo])).catch(() => {});
-        return prev; // will be updated by the fetch above
-      });
+    // Mirror to todo list (skip if already there for this hour)
+    if (date === plannerDate && !todos.some(t => t.text === trimmed && Number(t.start_hour) === Number(hour))) {
+      fetch("/api/todos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, text: trimmed, start_hour: hour, end_hour: Number(hour) + 1 }),
+      }).then(r => r.json()).then(todo => setTodos(p => [...p, todo])).catch(() => {});
     }
   }
 
@@ -601,13 +597,19 @@ export default function LifestylePlan() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: plannerDate, start_hour, end_hour, label: todo.text }),
       });
+      if (!bRes.ok) return; // bail on server error
       const block = await bRes.json();
       await fetch("/api/blocks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: block.id, tasks: [todo.text] }) });
       setBlocks(prev => [...prev.filter(b => b.id !== block.id), { ...block, tasks: [todo.text] }].sort((a, b) => a.start_hour - b.start_hour));
       newBlockId = block.id;
     } else {
-      // Single-hour: add to slot tasks
-      addTask(plannerDate, start_hour, todo.text);
+      // Single-hour: write directly to slot (bypassing addTask to avoid duplicate todo creation)
+      const updated = { ...tasks };
+      if (!updated[plannerDate]) updated[plannerDate] = {};
+      if (!(updated[plannerDate][start_hour] || []).includes(todo.text)) {
+        updated[plannerDate][start_hour] = [...(updated[plannerDate][start_hour] || []), todo.text];
+        saveTasks(updated, plannerDate, start_hour, updated[plannerDate][start_hour]);
+      }
     }
     await fetch("/api/todos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, start_hour, end_hour, block_id: newBlockId }) });
     setTodos(prev => prev.map(t => t.id === id ? { ...t, start_hour, end_hour, block_id: newBlockId } : t));
@@ -620,6 +622,16 @@ export default function LifestylePlan() {
     if (todo.block_id) {
       await fetch("/api/blocks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: todo.block_id }) });
       setBlocks(prev => prev.filter(b => b.id !== todo.block_id));
+    } else if (todo.start_hour != null) {
+      // Remove from single slot
+      const hour = Number(todo.start_hour);
+      const updated = { ...tasks };
+      if (updated[plannerDate]?.[hour]) {
+        const newList = updated[plannerDate][hour].filter(t => t !== todo.text);
+        if (newList.length === 0) delete updated[plannerDate][hour];
+        else updated[plannerDate][hour] = newList;
+        saveTasks(updated, plannerDate, hour, newList);
+      }
     }
     await fetch("/api/todos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, start_hour: null, end_hour: null, block_id: null }) });
     setTodos(prev => prev.map(t => t.id === id ? { ...t, start_hour: null, end_hour: null, block_id: null } : t));
@@ -711,12 +723,21 @@ export default function LifestylePlan() {
           border-bottom-color: #FFD700;
         }
 
+        .quarter-block { border-top: 1px solid rgba(255,255,255,0.05); }
+
+        .quarter-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 9px; font-weight: 500; letter-spacing: 4px;
+          text-transform: uppercase;
+          color: rgba(240,237,230,0.25);
+          padding: 14px 20px 6px;
+        }
+
         .months-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+          grid-template-columns: repeat(3, 1fr);
           gap: 1px;
           background: rgba(255,255,255,0.05);
-          border-top: 1px solid rgba(255,255,255,0.05);
         }
 
         .month-tile {
@@ -1206,6 +1227,66 @@ export default function LifestylePlan() {
         }
 
         /* Calendar */
+        .cal-layout {
+          display: flex;
+          gap: 0;
+          align-items: flex-start;
+        }
+        .cal-main { flex: 1; min-width: 0; }
+        .cal-milestone-panel {
+          width: 260px; min-width: 260px;
+          border-left: 1px solid rgba(255,255,255,0.06);
+          padding: 28px 24px 40px;
+          display: flex; flex-direction: column; gap: 20px;
+        }
+        .cal-milestone-month {
+          font-family: 'Playfair Display', serif;
+          font-size: 22px; font-weight: 700; color: #F0EDE6;
+          line-height: 1.1;
+        }
+        .cal-milestone-phase {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 9px; font-weight: 500; letter-spacing: 3px;
+          text-transform: uppercase;
+          color: var(--cal-accent, rgba(240,237,230,0.3));
+          margin-top: 4px;
+        }
+        .cal-milestone-theme {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px; color: rgba(240,237,230,0.55);
+          font-style: italic; margin-top: 2px;
+        }
+        .cal-milestone-vibe {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 12px; color: rgba(240,237,230,0.4);
+          line-height: 1.6; border-left: 2px solid var(--cal-accent, rgba(240,237,230,0.15));
+          padding-left: 10px;
+        }
+        .cal-milestone-text {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 12px; letter-spacing: 0.3px;
+          color: rgba(240,237,230,0.7);
+          background: rgba(255,255,255,0.04);
+          border-radius: 8px; padding: 10px 12px;
+          line-height: 1.5;
+        }
+        .cal-milestone-exps {
+          display: flex; flex-direction: column; gap: 6px;
+        }
+        .cal-milestone-exp {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px; color: rgba(240,237,230,0.45);
+          padding-left: 10px; position: relative; line-height: 1.4;
+        }
+        .cal-milestone-exp::before {
+          content: '→'; position: absolute; left: 0;
+          color: var(--cal-accent, rgba(240,237,230,0.2));
+        }
+        @media (max-width: 900px) {
+          .cal-layout { flex-direction: column; }
+          .cal-milestone-panel { width: 100%; min-width: 0; border-left: none; border-top: 1px solid rgba(255,255,255,0.06); }
+        }
+
         .cal-header {
           display: flex;
           align-items: center;
@@ -1808,29 +1889,39 @@ export default function LifestylePlan() {
             <div className="legend-item" style={{marginLeft:"auto", color:"rgba(240,237,230,0.25)"}}>Tap any month →</div>
           </div>
 
-          <div className="months-grid">
-            {months.map((m) => {
-              const dots = budgetDots[m.budget];
-              return (
-                <div
-                  key={m.id}
-                  className={`month-tile${active === m.id ? " active" : ""}`}
-                  style={{ "--accent": m.color }}
-                  onClick={() => setActive(active === m.id ? null : m.id)}
-                >
-                  <div className="tile-phase">{m.phase}</div>
-                  <div className="tile-month">{m.month}</div>
-                  <div className="tile-year">{m.year}</div>
-                  <div className="tile-theme">{m.theme}</div>
-                  <div className="budget-dots">
-                    {[1,2,3].map(i => (
-                      <div key={i} className={`dot${i <= dots ? " filled" : ""}`} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {[
+            { label: "Q1 — April · May · June 2026", ids: [1,2,3] },
+            { label: "Q2 — July · August · September 2026", ids: [4,5,6] },
+            { label: "Q3 — October · November · December 2026", ids: [7,8,9] },
+            { label: "Q4 — January · February · March 2027", ids: [10,11,12] },
+          ].map(({ label, ids }) => (
+            <div key={label} className="quarter-block">
+              <div className="quarter-label">{label}</div>
+              <div className="months-grid">
+                {months.filter(m => ids.includes(m.id)).map((m) => {
+                  const dots = budgetDots[m.budget];
+                  return (
+                    <div
+                      key={m.id}
+                      className={`month-tile${active === m.id ? " active" : ""}`}
+                      style={{ "--accent": m.color }}
+                      onClick={() => setActive(active === m.id ? null : m.id)}
+                    >
+                      <div className="tile-phase">{m.phase}</div>
+                      <div className="tile-month">{m.month}</div>
+                      <div className="tile-year">{m.year}</div>
+                      <div className="tile-theme">{m.theme}</div>
+                      <div className="budget-dots">
+                        {[1,2,3].map(i => (
+                          <div key={i} className={`dot${i <= dots ? " filled" : ""}`} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
 
           {selected ? (
             <div className="detail-panel" style={{ "--accent": selected.color }}>
@@ -1879,39 +1970,83 @@ export default function LifestylePlan() {
             }}>→</button>
           </div>
 
-          <div className="cal-grid">
-            <div className="cal-dow-row">
-              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
-                <div key={d} className="cal-dow">{d}</div>
-              ))}
-            </div>
-            {buildCalendarGrid(calYear, calMonth).map((week, wi) => (
-              <div key={wi} className="cal-week">
-                {week.map((iso, di) => {
-                  if (!iso) return <div key={di} className="cal-day cal-day-empty" />;
-                  const isToday = iso === today;
-                  const isSelected = iso === plannerDate;
-                  const hasTasks = Object.values(tasks[iso] || {}).some(arr => arr.length > 0);
-                  const dayNum = parseInt(iso.split("-")[2], 10);
-                  const [dy, dm, dd] = iso.split("-").map(Number);
-                  const dow = new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay();
-                  const isPayday = dow === 5 && iso >= "2026-04-17";
-                  return (
-                    <div
-                      key={di}
-                      className={`cal-day${isToday ? " today" : ""}${isSelected ? " selected" : ""}${isPayday ? " payday" : ""}`}
-                      onClick={() => {
-                        setPlannerDate(iso);
-                        setPlannerMode("day");
-                      }}
-                    >
-                      <span className="cal-day-num">{dayNum}</span>
-                      {hasTasks && <div className="cal-task-dot" />}
-                    </div>
-                  );
-                })}
+          <div className="cal-layout">
+            <div className="cal-main">
+              <div className="cal-grid">
+                <div className="cal-dow-row">
+                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+                    <div key={d} className="cal-dow">{d}</div>
+                  ))}
+                </div>
+                {buildCalendarGrid(calYear, calMonth).map((week, wi) => (
+                  <div key={wi} className="cal-week">
+                    {week.map((iso, di) => {
+                      if (!iso) return <div key={di} className="cal-day cal-day-empty" />;
+                      const isToday = iso === today;
+                      const isSelected = iso === plannerDate;
+                      const hasTasks = Object.values(tasks[iso] || {}).some(arr => arr.length > 0);
+                      const dayNum = parseInt(iso.split("-")[2], 10);
+                      const [dy, dm, dd] = iso.split("-").map(Number);
+                      const dow = new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay();
+                      const isPayday = dow === 5 && iso >= "2026-04-17";
+                      return (
+                        <div
+                          key={di}
+                          className={`cal-day${isToday ? " today" : ""}${isSelected ? " selected" : ""}${isPayday ? " payday" : ""}`}
+                          onClick={() => {
+                            setPlannerDate(iso);
+                            setPlannerMode("day");
+                          }}
+                        >
+                          <span className="cal-day-num">{dayNum}</span>
+                          {hasTasks && <div className="cal-task-dot" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {(() => {
+              const calMonthName = MONTH_NAMES[calMonth];
+              const calYearStr = calYear.toString();
+              const mData = months.find(m => m.month === calMonthName && m.year === calYearStr);
+              if (!mData) return (
+                <div className="cal-milestone-panel">
+                  <div className="cal-milestone-month" style={{ color: "rgba(240,237,230,0.3)" }}>
+                    {calMonthName} {calYearStr}
+                  </div>
+                  <div className="cal-milestone-text" style={{ color: "rgba(240,237,230,0.25)", marginTop: 12 }}>
+                    No plan data for this month.
+                  </div>
+                </div>
+              );
+              return (
+                <div className="cal-milestone-panel" style={{ "--cal-accent": mData.color }}>
+                  <div className="cal-milestone-month">{mData.month} {mData.year}</div>
+                  <div className="cal-milestone-phase">{mData.phase}</div>
+                  <div className="cal-milestone-theme">{mData.theme}</div>
+                  <div className="cal-milestone-vibe">{mData.vibe}</div>
+                  <div className="cal-milestone-text">Milestone</div>
+                  <div className="cal-milestone-exps">
+                    <div className="cal-milestone-exp" style={{ color: "var(--cal-accent, #FFD700)", fontWeight: 600 }}>
+                      {mData.milestone}
+                    </div>
+                  </div>
+                  <div className="cal-milestone-text" style={{ marginTop: 12 }}>Experiences</div>
+                  <div className="cal-milestone-exps">
+                    {mData.experiences.map((e, i) => (
+                      <div key={i} className="cal-milestone-exp">{e}</div>
+                    ))}
+                  </div>
+                  <div className="cal-milestone-text" style={{ marginTop: 12 }}>Travel</div>
+                  <div className="cal-milestone-exps">
+                    <div className="cal-milestone-exp">{mData.travel}</div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </>
       ) : (
