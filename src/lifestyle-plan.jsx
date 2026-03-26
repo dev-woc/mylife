@@ -957,6 +957,10 @@ export default function LifestylePlan() {
           opacity: 0.7;
         }
 
+        .cal-day.payday .cal-day-num { color: #4ADE80; }
+        .cal-day.payday { background: rgba(74,222,128,0.06); }
+        .cal-day.payday:hover { background: rgba(74,222,128,0.12); }
+
         .cal-day-empty { cursor: default; }
 
         .day-back-btn {
@@ -1090,10 +1094,13 @@ export default function LifestylePlan() {
                   const isSelected = iso === plannerDate;
                   const hasTasks = Object.values(tasks[iso] || {}).some(arr => arr.length > 0);
                   const dayNum = parseInt(iso.split("-")[2], 10);
+                  const [dy, dm, dd] = iso.split("-").map(Number);
+                  const dow = new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay();
+                  const isPayday = dow === 5 && iso >= "2026-04-17";
                   return (
                     <div
                       key={di}
-                      className={`cal-day${isToday ? " today" : ""}${isSelected ? " selected" : ""}`}
+                      className={`cal-day${isToday ? " today" : ""}${isSelected ? " selected" : ""}${isPayday ? " payday" : ""}`}
                       onClick={() => {
                         setPlannerDate(iso);
                         setPlannerMode("day");
