@@ -53,7 +53,7 @@ async function fetchRoute(stops) {
   }
 }
 
-export default function DayMap({ date, taskLinks = [] }) {
+export default function DayMap({ date, taskLinks = [], dayTasks = [], onTaskLinked }) {
   const mapRef = useRef(null);       // Leaflet map instance
   const mapElRef = useRef(null);     // DOM element for map
   const markersRef = useRef({});     // id → L.Marker
@@ -61,7 +61,7 @@ export default function DayMap({ date, taskLinks = [] }) {
 
   const [stops, setStops] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [nameInput, setNameInput] = useState("");
+  const [selectedTask, setSelectedTask] = useState("");
   const [addressInput, setAddressInput] = useState("");
   const [adding, setAdding] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
@@ -153,7 +153,7 @@ export default function DayMap({ date, taskLinks = [] }) {
   }, []);
 
   const addStop = useCallback(async () => {
-    if (!nameInput.trim() || !addressInput.trim()) return;
+    if (!selectedTask || !addressInput.trim()) return;
     setGeocoding(true);
     const coords = await geocode(addressInput).catch(() => null);
     setGeocoding(false);
@@ -161,16 +161,25 @@ export default function DayMap({ date, taskLinks = [] }) {
     const res = await fetch("/api/stops", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, name: nameInput.trim(), address: addressInput.trim(), ...coords }),
+      body: JSON.stringify({ date, name: selectedTask, address: addressInput.trim(), ...coords }),
     });
     const newStop = await res.json();
     if (coords) { newStop.lat = coords.lat; newStop.lng = coords.lng; }
 
+    // Auto-link the selected task to this stop
+    const linkRes = await fetch("/api/task-links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, hour: null, block_id: null, task_text: selectedTask, stop_id: newStop.id }),
+    });
+    const link = await linkRes.json();
+    if (onTaskLinked) onTaskLinked(link);
+
     setStops(prev => [...prev, newStop]);
-    setNameInput("");
+    setSelectedTask("");
     setAddressInput("");
     setAdding(false);
-  }, [date, nameInput, addressInput]);
+  }, [date, selectedTask, addressInput, onTaskLinked]);
 
   const deleteStop = useCallback(async (stop) => {
     await fetch("/api/stops", {
@@ -378,14 +387,18 @@ export default function DayMap({ date, taskLinks = [] }) {
           <div className="add-stop-panel">
             {adding ? (
               <div className="add-stop-form">
-                <input
+                <select
                   autoFocus
                   className="stop-input"
-                  placeholder="Label (e.g. Raytheon)"
-                  value={nameInput}
-                  onChange={e => setNameInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Escape") { setAdding(false); setNameInput(""); setAddressInput(""); } }}
-                />
+                  value={selectedTask}
+                  onChange={e => setSelectedTask(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Escape") { setAdding(false); setSelectedTask(""); setAddressInput(""); } }}
+                >
+                  <option value="">Pick a task…</option>
+                  {dayTasks.map((t, i) => (
+                    <option key={i} value={t}>{t.length > 42 ? t.slice(0, 42) + "…" : t}</option>
+                  ))}
+                </select>
                 <input
                   className="stop-input"
                   placeholder="Address"
@@ -393,18 +406,18 @@ export default function DayMap({ date, taskLinks = [] }) {
                   onChange={e => setAddressInput(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === "Enter") addStop();
-                    if (e.key === "Escape") { setAdding(false); setNameInput(""); setAddressInput(""); }
+                    if (e.key === "Escape") { setAdding(false); setSelectedTask(""); setAddressInput(""); }
                   }}
                 />
                 <div className="add-stop-actions">
                   <button
                     className="stop-save-btn"
                     onClick={addStop}
-                    disabled={geocoding || !nameInput.trim() || !addressInput.trim()}
+                    disabled={geocoding || !selectedTask || !addressInput.trim()}
                   >
                     {geocoding ? "Locating…" : "Add Stop"}
                   </button>
-                  <button className="stop-cancel-btn" onClick={() => { setAdding(false); setNameInput(""); setAddressInput(""); }}>
+                  <button className="stop-cancel-btn" onClick={() => { setAdding(false); setSelectedTask(""); setAddressInput(""); }}>
                     Cancel
                   </button>
                 </div>

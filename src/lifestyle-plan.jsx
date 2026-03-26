@@ -1799,7 +1799,12 @@ export default function LifestylePlan() {
 
           {dayTab === "map" ? (
             <Suspense fallback={<div style={{padding:"40px 40px",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(44,31,20,0.3)",letterSpacing:2,textTransform:"uppercase"}}>Loading map…</div>}>
-              <DayMap date={plannerDate} taskLinks={taskLinks} />
+              <DayMap
+                date={plannerDate}
+                taskLinks={taskLinks}
+                dayTasks={Object.values(dayTasks).flat().filter((t, i, a) => a.indexOf(t) === i)}
+                onTaskLinked={link => setTaskLinks(prev => [...prev.filter(l => l.task_text !== link.task_text), link])}
+              />
             </Suspense>
           ) : null}
 
