@@ -1572,16 +1572,18 @@ export default function LifestylePlan() {
             {showBlockForm && (
               <div className="block-form-bar">
                 <div className="block-form-field">
-                  <span className="block-form-label">Label</span>
-                  <input
+                  <span className="block-form-label">Task</span>
+                  <select
                     autoFocus
-                    className="block-form-input"
-                    placeholder="e.g. Work"
+                    className="block-form-select"
                     value={blockForm.label}
                     onChange={e => setBlockForm(f => ({ ...f, label: e.target.value }))}
-                    onKeyDown={e => { if (e.key === "Enter") createBlock(); if (e.key === "Escape") setShowBlockForm(false); }}
-                    style={{ width: 120 }}
-                  />
+                  >
+                    <option value="">Pick a task…</option>
+                    {Object.values(dayTasks).flat().filter((t, i, a) => a.indexOf(t) === i).map(t => (
+                      <option key={t} value={t}>{t.length > 40 ? t.slice(0, 40) + "…" : t}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="block-form-field">
                   <span className="block-form-label">From</span>
@@ -1596,7 +1598,7 @@ export default function LifestylePlan() {
                   </select>
                 </div>
                 <div className="block-form-actions">
-                  <button className="block-create-btn" onClick={createBlock} disabled={blockForm.start_hour >= blockForm.end_hour}>Create</button>
+                  <button className="block-create-btn" onClick={createBlock} disabled={blockForm.start_hour >= blockForm.end_hour || !blockForm.label}>Create</button>
                   <button className="block-cancel-btn" onClick={() => setShowBlockForm(false)}>Cancel</button>
                 </div>
               </div>
