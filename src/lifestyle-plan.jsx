@@ -215,24 +215,45 @@ async function persistSlotToDB(date, hour, taskList) {
   });
 }
 
+function buildCalendarGrid(year, month) {
+  // Returns array of weeks; each week is array of 7 ISO strings or null (padding)
+  const firstDay = new Date(Date.UTC(year, month, 1)).getUTCDay(); // 0=Sun
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
 export default function LifestylePlan() {
   const [view, setView] = useState("plan");
   const [active, setActive] = useState(null);
 
   // Day planner state
-  const [plannerDate, setPlannerDate] = useState(todayISO);
+  const today = todayISO();
+  const [plannerMode, setPlannerMode] = useState("calendar"); // "calendar" | "day"
+  const [plannerDate, setPlannerDate] = useState(today);
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [tasks, setTasks] = useState(loadCache);
   const [syncing, setSyncing] = useState(false);
-  const [addingSlot, setAddingSlot] = useState(null); // { date, hour }
+  const [addingSlot, setAddingSlot] = useState(null);
   const [addingValue, setAddingValue] = useState("");
-  const [editingSlot, setEditingSlot] = useState(null); // { date, hour, index }
+  const [editingSlot, setEditingSlot] = useState(null);
   const [editingValue, setEditingValue] = useState("");
 
   const gridRef = useRef(null);
 
-  // Load from DB whenever the date changes (planner view)
+  // Load from DB when entering day view
   useEffect(() => {
-    if (view !== "planner") return;
+    if (view !== "planner" || plannerMode !== "day") return;
     setSyncing(true);
     fetchDayFromDB(plannerDate).then((dayData) => {
       if (dayData) {
@@ -244,14 +265,14 @@ export default function LifestylePlan() {
       }
       setSyncing(false);
     }).catch(() => setSyncing(false));
-  }, [plannerDate, view]);
+  }, [plannerDate, plannerMode, view]);
 
   useEffect(() => {
-    if (view === "planner" && gridRef.current) {
+    if (plannerMode === "day" && gridRef.current) {
       const rows = gridRef.current.querySelectorAll(".time-row");
       if (rows[2]) rows[2].scrollIntoView({ block: "start" });
     }
-  }, [view]);
+  }, [plannerMode]);
 
   const selected = months.find((m) => m.id === active);
 
@@ -836,6 +857,122 @@ export default function LifestylePlan() {
           width: 200px;
           border-radius: 0;
         }
+
+        /* Calendar */
+        .cal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 32px;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .cal-month-label {
+          font-family: 'Playfair Display', serif;
+          font-size: clamp(22px, 4vw, 36px);
+          font-weight: 700;
+          color: #F0EDE6;
+        }
+
+        .cal-nav-btn {
+          background: none;
+          border: none;
+          color: rgba(240,237,230,0.4);
+          font-size: 22px;
+          cursor: pointer;
+          padding: 4px 10px;
+          transition: color 0.15s;
+          line-height: 1;
+          font-family: 'DM Sans', sans-serif;
+        }
+
+        .cal-nav-btn:hover { color: rgba(240,237,230,0.9); }
+
+        .cal-grid {
+          padding: 16px 24px 32px;
+          animation: slideUp 0.2s ease;
+        }
+
+        .cal-dow-row {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          margin-bottom: 4px;
+        }
+
+        .cal-dow {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: rgba(240,237,230,0.25);
+          text-align: center;
+          padding: 6px 0;
+        }
+
+        .cal-week {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 4px;
+          margin-bottom: 4px;
+        }
+
+        .cal-day {
+          aspect-ratio: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background 0.12s;
+          position: relative;
+        }
+
+        .cal-day:hover { background: rgba(255,255,255,0.06); }
+
+        .cal-day.today .cal-day-num {
+          color: #FFD700;
+          font-weight: 700;
+        }
+
+        .cal-day.selected {
+          background: rgba(255,215,0,0.1);
+          border: 1px solid rgba(255,215,0,0.25);
+        }
+
+        .cal-day-num {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 14px;
+          color: rgba(240,237,230,0.75);
+          line-height: 1;
+        }
+
+        .cal-task-dot {
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: #FFD700;
+          opacity: 0.7;
+        }
+
+        .cal-day-empty { cursor: default; }
+
+        .day-back-btn {
+          background: none;
+          border: none;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: rgba(240,237,230,0.35);
+          cursor: pointer;
+          padding: 0;
+          transition: color 0.15s;
+        }
+
+        .day-back-btn:hover { color: rgba(240,237,230,0.8); }
       `}</style>
 
       <div className="plan-header">
@@ -925,6 +1062,52 @@ export default function LifestylePlan() {
             <div className="empty-state">Select a month above to see the full breakdown.</div>
           )}
         </>
+      ) : plannerMode === "calendar" ? (
+        <>
+          <div className="cal-header">
+            <button className="cal-nav-btn" onClick={() => {
+              if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
+              else setCalMonth(m => m - 1);
+            }}>←</button>
+            <div className="cal-month-label">{MONTH_NAMES[calMonth]} {calYear}</div>
+            <button className="cal-nav-btn" onClick={() => {
+              if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
+              else setCalMonth(m => m + 1);
+            }}>→</button>
+          </div>
+
+          <div className="cal-grid">
+            <div className="cal-dow-row">
+              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+                <div key={d} className="cal-dow">{d}</div>
+              ))}
+            </div>
+            {buildCalendarGrid(calYear, calMonth).map((week, wi) => (
+              <div key={wi} className="cal-week">
+                {week.map((iso, di) => {
+                  if (!iso) return <div key={di} className="cal-day cal-day-empty" />;
+                  const isToday = iso === today;
+                  const isSelected = iso === plannerDate;
+                  const hasTasks = Object.values(tasks[iso] || {}).some(arr => arr.length > 0);
+                  const dayNum = parseInt(iso.split("-")[2], 10);
+                  return (
+                    <div
+                      key={di}
+                      className={`cal-day${isToday ? " today" : ""}${isSelected ? " selected" : ""}`}
+                      onClick={() => {
+                        setPlannerDate(iso);
+                        setPlannerMode("day");
+                      }}
+                    >
+                      <span className="cal-day-num">{dayNum}</span>
+                      {hasTasks && <div className="cal-task-dot" />}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </>
       ) : (
         <>
           <div className="planner-date-nav">
@@ -935,7 +1118,10 @@ export default function LifestylePlan() {
               ←
             </button>
             <div className="planner-date-center">
-              <div className="planner-date-label">{formatDateLabel(plannerDate)}</div>
+              <button className="day-back-btn" onClick={() => setPlannerMode("calendar")}>
+                ← Calendar
+              </button>
+              <div className="planner-date-label" style={{marginTop: 6}}>{formatDateLabel(plannerDate)}</div>
               <div className="planner-task-count">
                 {syncing ? "syncing..." : totalTaskCount === 0 ? "No tasks yet" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
               </div>
