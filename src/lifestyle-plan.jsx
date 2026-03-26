@@ -304,7 +304,7 @@ export default function LifestylePlan() {
     setLinkingTask(null);
     setTodos([]);
     fetch(`/api/blocks?date=${plannerDate}`)
-      .then(r => r.json()).then(d => setBlocks(Array.isArray(d) ? d : [])).catch(() => {});
+      .then(r => r.json()).then(d => setBlocks(Array.isArray(d) ? d.map(b => ({ ...b, start_hour: Number(b.start_hour), end_hour: Number(b.end_hour) })) : [])).catch(() => {});
     fetch(`/api/stops?date=${plannerDate}`)
       .then(r => r.json()).then(d => setDayStops(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/task-links?date=${plannerDate}`)
@@ -472,7 +472,7 @@ export default function LifestylePlan() {
       body: JSON.stringify({ date: plannerDate, start_hour, end_hour, label }),
     });
     const block = await res.json();
-    setBlocks(prev => [...prev, { ...block, tasks: block.tasks || [] }].sort((a, b) => a.start_hour - b.start_hour));
+    setBlocks(prev => [...prev, { ...block, start_hour: Number(block.start_hour), end_hour: Number(block.end_hour), tasks: block.tasks || [] }].sort((a, b) => a.start_hour - b.start_hour));
     setShowBlockForm(false);
     setBlockForm({ label: "", start_hour: 9, end_hour: 17 });
   }
@@ -610,7 +610,7 @@ export default function LifestylePlan() {
       if (!bRes.ok) return; // bail on server error
       const block = await bRes.json();
       await fetch("/api/blocks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: block.id, tasks: [todo.text] }) });
-      setBlocks(prev => [...prev.filter(b => b.id !== block.id), { ...block, tasks: [todo.text] }].sort((a, b) => a.start_hour - b.start_hour));
+      setBlocks(prev => [...prev.filter(b => b.id !== block.id), { ...block, start_hour: Number(block.start_hour), end_hour: Number(block.end_hour), tasks: [todo.text] }].sort((a, b) => a.start_hour - b.start_hour));
       newBlockId = block.id;
     } else {
       // Single-hour: write directly to slot (bypassing addTask to avoid duplicate todo creation)
@@ -2141,8 +2141,10 @@ export default function LifestylePlan() {
               const coveredHours = new Set();
               const blockByStart = {};
               blocks.forEach(block => {
-                blockByStart[block.start_hour] = block;
-                for (let h = block.start_hour; h < block.end_hour; h++) coveredHours.add(h);
+                const bStart = Number(block.start_hour);
+                const bEnd = Number(block.end_hour);
+                blockByStart[bStart] = block;
+                HOURS.forEach(h => { if (h >= bStart && h < bEnd) coveredHours.add(h); });
               });
 
               const renderTaskArea = (taskList, blockId, onAdd, onAddValue, onAddChange, onAddCommit, onAddCancel, isAddingThis) => (
