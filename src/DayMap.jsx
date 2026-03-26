@@ -53,7 +53,7 @@ async function fetchRoute(stops) {
   }
 }
 
-export default function DayMap({ date }) {
+export default function DayMap({ date, taskLinks = [] }) {
   const mapRef = useRef(null);       // Leaflet map instance
   const mapElRef = useRef(null);     // DOM element for map
   const markersRef = useRef({});     // id → L.Marker
@@ -106,12 +106,21 @@ export default function DayMap({ date }) {
 
     // Add markers
     geo.forEach(stop => {
+      const linked = taskLinks.filter(l => l.stop_id === stop.id);
+      const tasksHtml = linked.length
+        ? `<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">${
+            linked.map(l =>
+              `<div style="font-family:'DM Sans',sans-serif;font-size:11px;color:#2C1F14;background:#F5EEE6;border-radius:4px;padding:2px 6px">• ${l.task_text}</div>`
+            ).join("")
+          }</div>`
+        : "";
       const marker = L.marker([stop.lat, stop.lng], {
         icon: makeMarkerIcon(stop.position, activeStop === stop.id),
       });
       marker.bindPopup(
         `<b style="font-family:'DM Sans',sans-serif;color:#2C1F14">${stop.name}</b>` +
-        `<br/><span style="font-size:11px;color:rgba(44,31,20,0.5)">${stop.address}</span>`
+        `<br/><span style="font-size:11px;color:rgba(44,31,20,0.5)">${stop.address}</span>` +
+        tasksHtml
       );
       marker.on("click", () => setActiveStop(id => id === stop.id ? null : stop.id));
       marker.addTo(map);
@@ -136,7 +145,7 @@ export default function DayMap({ date }) {
         }).addTo(mapRef.current);
       });
     }
-  }, [stops, activeStop]);
+  }, [stops, activeStop, taskLinks]);
 
   // Invalidate map size when tab becomes visible
   useEffect(() => {
@@ -348,6 +357,13 @@ export default function DayMap({ date }) {
                   <div className="stop-info">
                     <div className="stop-name">{stop.name}</div>
                     <div className="stop-address">{stop.address}</div>
+                    {taskLinks.filter(l => l.stop_id === stop.id).map(l => (
+                      <div key={l.id} style={{
+                        fontFamily: "'DM Sans',sans-serif", fontSize: 11,
+                        color: "#C0733A", marginTop: 3,
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}>→ {l.task_text}</div>
+                    ))}
                   </div>
                   <button
                     className="stop-delete"

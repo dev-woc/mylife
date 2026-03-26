@@ -257,19 +257,29 @@ export default function LifestylePlan() {
   const [blockForm, setBlockForm] = useState({ label: "", start_hour: 9, end_hour: 17 });
   const [blockAddingId, setBlockAddingId] = useState(null);
   const [blockAddingValue, setBlockAddingValue] = useState("");
-  const [blockEditingSlot, setBlockEditingSlot] = useState(null); // { blockId, index }
+  const [blockEditingSlot, setBlockEditingSlot] = useState(null);
   const [blockEditingValue, setBlockEditingValue] = useState("");
+
+  // Stop linking
+  const [dayStops, setDayStops] = useState([]);
+  const [taskLinks, setTaskLinks] = useState([]);
+  const [linkingTask, setLinkingTask] = useState(null); // { hour, blockId, taskText }
 
   const gridRef = useRef(null);
 
-  // Reset tab + blocks when switching days
+  // Reset + reload day data when date changes
   useEffect(() => {
     setDayTab("schedule");
     setBlocks([]);
+    setDayStops([]);
+    setTaskLinks([]);
+    setLinkingTask(null);
     fetch(`/api/blocks?date=${plannerDate}`)
-      .then(r => r.json())
-      .then(data => setBlocks(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .then(r => r.json()).then(d => setBlocks(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`/api/stops?date=${plannerDate}`)
+      .then(r => r.json()).then(d => setDayStops(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`/api/task-links?date=${plannerDate}`)
+      .then(r => r.json()).then(d => setTaskLinks(Array.isArray(d) ? d : [])).catch(() => {});
   }, [plannerDate]);
 
   // Load from DB when entering day view
@@ -366,6 +376,32 @@ export default function LifestylePlan() {
     }
     setEditingSlot(null);
     setEditingValue("");
+  }
+
+  function getTaskLink(hour, taskText, blockId = null) {
+    return taskLinks.find(l =>
+      l.task_text === taskText &&
+      (blockId ? l.block_id === blockId : l.hour === hour)
+    ) || null;
+  }
+
+  async function linkTask(hour, blockId, taskText, stopId) {
+    const res = await fetch("/api/task-links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: plannerDate, hour: hour ?? null, block_id: blockId ?? null, task_text: taskText, stop_id: stopId }),
+    });
+    const link = await res.json();
+    setTaskLinks(prev => [...prev.filter(l => l.task_text !== taskText || (blockId ? l.block_id !== blockId : l.hour !== hour)), link]);
+  }
+
+  async function unlinkTask(linkId) {
+    await fetch("/api/task-links", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: linkId }),
+    });
+    setTaskLinks(prev => prev.filter(l => l.id !== linkId));
   }
 
   async function createBlock() {
@@ -1128,6 +1164,53 @@ export default function LifestylePlan() {
           border-bottom-color: #C0733A;
         }
 
+        /* Stop link badge + button */
+        .task-stop-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #C0733A;
+          color: #FFFBF7;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          font-weight: 700;
+          flex-shrink: 0;
+          cursor: pointer;
+          transition: opacity 0.15s;
+        }
+        .task-stop-badge:hover { opacity: 0.75; }
+
+        .task-link-btn {
+          background: none;
+          border: none;
+          color: rgba(44,31,20,0.2);
+          font-size: 13px;
+          cursor: pointer;
+          padding: 0;
+          line-height: 1;
+          flex-shrink: 0;
+          transition: color 0.15s;
+          opacity: 0;
+        }
+        .task-chip:hover .task-link-btn { opacity: 1; }
+        .task-link-btn:hover { color: #C0733A; }
+
+        .task-stop-select {
+          background: #F5EEE6;
+          border: 1px solid #C0733A;
+          border-radius: 6px;
+          padding: 3px 6px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 12px;
+          color: #2C1F14;
+          outline: none;
+          cursor: pointer;
+          max-width: 160px;
+        }
+
         /* Merged blocks */
         .block-card {
           margin: 4px 40px 4px;
@@ -1471,7 +1554,7 @@ export default function LifestylePlan() {
 
           {dayTab === "map" ? (
             <Suspense fallback={<div style={{padding:"40px 40px",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"rgba(44,31,20,0.3)",letterSpacing:2,textTransform:"uppercase"}}>Loading map…</div>}>
-              <DayMap date={plannerDate} />
+              <DayMap date={plannerDate} taskLinks={taskLinks} />
             </Suspense>
           ) : null}
 
@@ -1510,18 +1593,18 @@ export default function LifestylePlan() {
             )}
 
             {(() => {
-              // Precompute which hours are covered by blocks
+              // Precompute which hours are covered by blocks (end_hour is exclusive)
               const coveredHours = new Set();
               const blockByStart = {};
               blocks.forEach(block => {
                 blockByStart[block.start_hour] = block;
-                for (let h = block.start_hour; h <= block.end_hour; h++) coveredHours.add(h);
+                for (let h = block.start_hour; h < block.end_hour; h++) coveredHours.add(h);
               });
 
-              const renderTaskArea = (taskList, onAdd, onAddValue, onAddChange, onAddCommit, onAddCancel, isAddingThis) => (
+              const renderTaskArea = (taskList, blockId, onAdd, onAddValue, onAddChange, onAddCommit, onAddCancel, isAddingThis) => (
                 <div className="block-tasks">
                   {taskList.map((task, idx) => {
-                    const isEditing = blockEditingSlot?.blockId === onAddCommit.blockId && blockEditingSlot?.index === idx;
+                    const isEditing = blockEditingSlot?.blockId === blockId && blockEditingSlot?.index === idx;
                     if (isEditing) {
                       return (
                         <textarea key={idx} autoFocus className="task-inline-input"
@@ -1533,15 +1616,37 @@ export default function LifestylePlan() {
                         />
                       );
                     }
+                    const link = getTaskLink(null, task, blockId);
+                    const linkedStop = link ? dayStops.find(s => s.id === link.stop_id) : null;
+                    const isLinkingThis = linkingTask?.blockId === blockId && linkingTask?.taskText === task;
                     return (
                       <div key={idx} className="task-chip"
-                        onClick={() => { setBlockEditingSlot({ blockId: onAddCommit.blockId, index: idx }); setBlockEditingValue(task); setBlockAddingId(null); }}
+                        onClick={() => { setBlockEditingSlot({ blockId, index: idx }); setBlockEditingValue(task); setBlockAddingId(null); setLinkingTask(null); }}
                       >
                         <span className="task-chip-text">{task}</span>
+                        {isLinkingThis ? (
+                          <select className="task-stop-select" autoFocus
+                            onBlur={() => setLinkingTask(null)}
+                            onChange={e => { if (e.target.value) { linkTask(null, blockId, task, +e.target.value); setLinkingTask(null); } }}
+                            onMouseDown={e => e.stopPropagation()}
+                          >
+                            <option value="">Link to stop…</option>
+                            {dayStops.map(s => <option key={s.id} value={s.id}>{s.position}. {s.name}</option>)}
+                          </select>
+                        ) : linkedStop ? (
+                          <span className="task-stop-badge" title={`Linked to ${linkedStop.name}`}
+                            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); unlinkTask(link.id); }}
+                          >{linkedStop.position}</span>
+                        ) : dayStops.length > 0 ? (
+                          <button className="task-link-btn" title="Link to map stop"
+                            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setLinkingTask({ blockId, taskText: task }); }}
+                          >⊕</button>
+                        ) : null}
                         <span className="task-chip-delete"
                           onMouseDown={e => { e.preventDefault(); e.stopPropagation();
-                            const b = blocks.find(b => b.id === onAddCommit.blockId);
+                            const b = blocks.find(b => b.id === blockId);
                             if (b) updateBlockTasks(b.id, b.tasks.filter((_, i) => i !== idx));
+                            if (link) unlinkTask(link.id);
                           }}
                         >×</span>
                       </div>
@@ -1566,7 +1671,11 @@ export default function LifestylePlan() {
                 { label: "Morning",   hours: HOURS.filter(h => h < 12) },
                 { label: "Afternoon", hours: HOURS.filter(h => h >= 12 && h < 18) },
                 { label: "Evening",   hours: HOURS.filter(h => h >= 18) },
-              ].map(({ label, hours }) => (
+              ].map(({ label, hours }) => {
+                // Skip section entirely if all hours are covered (not a block start)
+                const hasVisible = hours.some(h => blockByStart[h] || !coveredHours.has(h));
+                if (!hasVisible) return null;
+                return (
                 <div key={label} className="day-section">
                   <div className="day-section-header">
                     <span className="day-section-label">{label}</span>
@@ -1582,19 +1691,19 @@ export default function LifestylePlan() {
                           <div className="block-header">
                             <div className="block-title-group">
                               <div className="block-label">{block.label || "Block"}</div>
-                              <div className="block-range">{formatHour(block.start_hour)} → {formatHour(block.end_hour)}</div>
+                              <div className="block-range">{formatHour(block.start_hour)} – {formatHour(block.end_hour)}</div>
                             </div>
                             <button className="block-delete-btn" onClick={() => deleteBlock(block.id)}>×</button>
                           </div>
                           {renderTaskArea(
                             block.tasks || [],
+                            block.id,
                             () => { setBlockAddingId(block.id); setBlockAddingValue(""); setAddingSlot(null); },
                             blockAddingValue,
                             setBlockAddingValue,
                             () => { commitBlockAdd(); },
                             () => { setBlockAddingId(null); setBlockAddingValue(""); },
-                            isAddingBlock,
-                            { blockId: block.id }
+                            isAddingBlock
                           )}
                         </div>
                       );
@@ -1625,11 +1734,32 @@ export default function LifestylePlan() {
                                 />
                               );
                             }
+                            const link = getTaskLink(hour, task);
+                            const linkedStop = link ? dayStops.find(s => s.id === link.stop_id) : null;
+                            const isLinkingThis = linkingTask?.hour === hour && linkingTask?.taskText === task;
                             return (
                               <div key={idx} className="task-chip"
-                                onClick={() => { setAddingSlot(null); setEditingSlot({ date: plannerDate, hour, index: idx }); setEditingValue(task); }}
+                                onClick={() => { setAddingSlot(null); setLinkingTask(null); setEditingSlot({ date: plannerDate, hour, index: idx }); setEditingValue(task); }}
                               >
                                 <span className="task-chip-text">{task}</span>
+                                {isLinkingThis ? (
+                                  <select className="task-stop-select" autoFocus
+                                    onBlur={() => setLinkingTask(null)}
+                                    onChange={e => { if (e.target.value) { linkTask(hour, null, task, +e.target.value); setLinkingTask(null); } }}
+                                    onMouseDown={e => e.stopPropagation()}
+                                  >
+                                    <option value="">Link to stop…</option>
+                                    {dayStops.map(s => <option key={s.id} value={s.id}>{s.position}. {s.name}</option>)}
+                                  </select>
+                                ) : linkedStop ? (
+                                  <span className="task-stop-badge" title={`Linked to ${linkedStop.name}`}
+                                    onMouseDown={e => { e.preventDefault(); e.stopPropagation(); unlinkTask(link.id); }}
+                                  >{linkedStop.position}</span>
+                                ) : dayStops.length > 0 ? (
+                                  <button className="task-link-btn" title="Link to map stop"
+                                    onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setLinkingTask({ hour, taskText: task }); }}
+                                  >⊕</button>
+                                ) : null}
                                 <span className="task-chip-delete"
                                   onMouseDown={e => { e.preventDefault(); e.stopPropagation(); deleteTask(plannerDate, hour, idx); }}
                                 >×</span>
@@ -1654,7 +1784,8 @@ export default function LifestylePlan() {
                     );
                   })}
                 </div>
-              ));
+                );
+              });
             })()}
           </div>
         </div>
