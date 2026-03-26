@@ -1025,34 +1025,32 @@ export default function LifestylePlan() {
 
         .day-tab-bar {
           display: flex;
-          gap: 2px;
-          background: rgba(44,31,20,0.07);
-          border-radius: 8px;
-          padding: 3px;
-          margin-top: 10px;
+          border-bottom: 1px solid rgba(44,31,20,0.1);
+          background: #F5EEE6;
+          padding: 0 40px;
         }
 
         .day-tab-btn {
           background: none;
           border: none;
+          border-bottom: 2px solid transparent;
           font-family: 'DM Sans', sans-serif;
           font-size: 11px;
           font-weight: 500;
-          letter-spacing: 1.5px;
+          letter-spacing: 3px;
           text-transform: uppercase;
-          color: rgba(44,31,20,0.4);
+          color: rgba(44,31,20,0.35);
           cursor: pointer;
-          padding: 5px 14px;
-          border-radius: 6px;
-          transition: all 0.15s;
+          padding: 12px 0;
+          margin-right: 28px;
+          transition: color 0.15s, border-color 0.15s;
         }
 
-        .day-tab-btn:hover { color: rgba(44,31,20,0.7); }
+        .day-tab-btn:hover { color: rgba(44,31,20,0.65); }
 
         .day-tab-btn.active {
-          background: #FFFBF7;
           color: #2C1F14;
-          box-shadow: 0 1px 3px rgba(44,31,20,0.1);
+          border-bottom-color: #C0733A;
         }
 
         .day-back-btn {
@@ -1217,12 +1215,13 @@ export default function LifestylePlan() {
               <div className="planner-task-count">
                 {syncing ? "syncing…" : totalTaskCount === 0 ? "Nothing planned" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
               </div>
-              <div className="day-tab-bar">
-                <button className={`day-tab-btn${dayTab === "schedule" ? " active" : ""}`} onClick={() => setDayTab("schedule")}>Schedule</button>
-                <button className={`day-tab-btn${dayTab === "map" ? " active" : ""}`} onClick={() => setDayTab("map")}>Map</button>
-              </div>
             </div>
             <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, 1))}>→</button>
+          </div>
+
+          <div className="day-tab-bar">
+            <button className={`day-tab-btn${dayTab === "schedule" ? " active" : ""}`} onClick={() => setDayTab("schedule")}>Schedule</button>
+            <button className={`day-tab-btn${dayTab === "map" ? " active" : ""}`} onClick={() => setDayTab("map")}>Map</button>
           </div>
 
           {dayTab === "map" ? (
