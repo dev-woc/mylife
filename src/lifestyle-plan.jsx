@@ -161,7 +161,7 @@ const months = [
 
 const budgetDots = { "$": 1, "$$": 2, "$$$": 3 };
 
-const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 6am–11pm
+const HOURS = Array.from({ length: 19 }, (_, i) => i + 5); // 5am–11pm
 
 function formatHour(h) {
   if (h === 0) return "12 AM";
