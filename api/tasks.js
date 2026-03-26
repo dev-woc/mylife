@@ -11,13 +11,20 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // GET /api/tasks?date=YYYY-MM-DD  → return all hours for that date
-  // GET /api/tasks                  → return all rows
+  // GET /api/tasks?date=YYYY-MM-DD  → hours for one date
+  // GET /api/tasks?month=YYYY-MM   → all hours for every day in that month
+  // GET /api/tasks                 → all rows
   if (req.method === "GET") {
-    const { date } = req.query;
-    const rows = date
-      ? await sql`SELECT hour, tasks FROM day_tasks WHERE date = ${date} ORDER BY hour`
-      : await sql`SELECT date::text, hour, tasks FROM day_tasks ORDER BY date, hour`;
+    const { date, month } = req.query;
+    let rows;
+    if (date) {
+      rows = await sql`SELECT hour, tasks FROM day_tasks WHERE date = ${date} ORDER BY hour`;
+    } else if (month) {
+      // month = "2026-04" → fetch 2026-04-01 to 2026-04-30
+      rows = await sql`SELECT date::text, hour, tasks FROM day_tasks WHERE to_char(date, 'YYYY-MM') = ${month} ORDER BY date, hour`;
+    } else {
+      rows = await sql`SELECT date::text, hour, tasks FROM day_tasks ORDER BY date, hour`;
+    }
 
     // Shape into { [date]: { [hour]: string[] } }
     // Parse hour to Number so keys like "9.0" normalise to "9" on the client

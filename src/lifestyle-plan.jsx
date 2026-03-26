@@ -358,6 +358,23 @@ export default function LifestylePlan() {
     }
   }, [plannerMode]);
 
+  // Prefetch all tasks for the visible calendar month so hover previews have data
+  useEffect(() => {
+    if (view !== "planner" || plannerMode !== "calendar") return;
+    const monthStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}`;
+    fetch(`/api/tasks?month=${monthStr}`)
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data !== "object" || Array.isArray(data)) return;
+        setTasks(prev => {
+          const merged = { ...prev, ...data };
+          saveCache(merged);
+          return merged;
+        });
+      })
+      .catch(() => {});
+  }, [calYear, calMonth, plannerMode, view]);
+
   const selected = months.find((m) => m.id === active);
 
   // Update local state + cache, then persist the changed slot to DB
