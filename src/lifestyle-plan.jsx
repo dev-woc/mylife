@@ -1401,6 +1401,12 @@ export default function LifestylePlan() {
 
         .cal-day-empty { cursor: default; }
 
+        .cal-day.past .cal-day-num {
+          text-decoration: line-through;
+          color: rgba(240,237,230,0.25);
+        }
+        .cal-day.past { opacity: 0.5; }
+
         .day-tab-bar {
           display: flex;
           border-bottom: 1px solid rgba(44,31,20,0.1);
@@ -1993,6 +1999,7 @@ export default function LifestylePlan() {
                     {week.map((iso, di) => {
                       if (!iso) return <div key={di} className="cal-day cal-day-empty" />;
                       const isToday = iso === today;
+                      const isPast = iso < today;
                       const isSelected = iso === plannerDate;
                       const hasTasks = Object.values(tasks[iso] || {}).some(arr => arr.length > 0);
                       const dayNum = parseInt(iso.split("-")[2], 10);
@@ -2002,7 +2009,7 @@ export default function LifestylePlan() {
                       return (
                         <div
                           key={di}
-                          className={`cal-day${isToday ? " today" : ""}${isSelected ? " selected" : ""}${isPayday ? " payday" : ""}`}
+                          className={`cal-day${isPast ? " past" : ""}${isToday ? " today" : ""}${isSelected ? " selected" : ""}${isPayday ? " payday" : ""}`}
                           onClick={() => {
                             setPlannerDate(iso);
                             setPlannerMode("day");
