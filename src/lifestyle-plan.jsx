@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-const DayMap = lazy(() => import("./DayMap"));
+const DayMap = lazy(() =>
+  import("./DayMap").catch(() => {
+    // Stale chunk after a new deploy — reload once to get fresh assets
+    const reloaded = sessionStorage.getItem("daymap-reload");
+    if (!reloaded) {
+      sessionStorage.setItem("daymap-reload", "1");
+      window.location.reload();
+    }
+    return { default: () => null };
+  })
+);
 
 const months = [
   {
