@@ -585,10 +585,20 @@ export default function LifestylePlan() {
     const todo = todos.find(t => t.id === id);
     if (!todo) return;
     const duration = end_hour - start_hour;
-    // Delete old block if it existed
+    // Remove old schedule entry before writing new one
     if (todo.block_id) {
       await fetch("/api/blocks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: todo.block_id }) });
       setBlocks(prev => prev.filter(b => b.id !== todo.block_id));
+    } else if (todo.start_hour != null) {
+      // Was in a single-hour slot — remove it
+      const oldHour = Number(todo.start_hour);
+      const updated = { ...tasks };
+      if (updated[plannerDate]?.[oldHour]) {
+        const newList = updated[plannerDate][oldHour].filter(t => t !== todo.text);
+        if (newList.length === 0) delete updated[plannerDate][oldHour];
+        else updated[plannerDate][oldHour] = newList;
+        saveTasks(updated, plannerDate, oldHour, newList);
+      }
     }
     let newBlockId = null;
     if (duration > 1) {
