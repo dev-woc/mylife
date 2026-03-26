@@ -293,6 +293,9 @@ export default function LifestylePlan() {
   const [editingTodoTime, setEditingTodoTime] = useState(null); // id
   const [todoTimeForm, setTodoTimeForm] = useState({ start_hour: 9, end_hour: 10 });
 
+  // Calendar hover preview
+  const [calHoverDay, setCalHoverDay] = useState(null);
+
   // Habits
   const HABIT_DEFAULTS = ["Gym / Train", "Read", "Cook / Meal Prep", "No Junk Spend", "Network", "Journal"];
   const [habits, setHabits] = useState([]); // [{ label, done }]
@@ -1437,6 +1440,47 @@ export default function LifestylePlan() {
 
         .cal-day-empty { cursor: default; }
 
+        /* Hover task preview */
+        .cal-day-preview {
+          position: absolute;
+          top: calc(100% + 6px);
+          z-index: 50;
+          width: 220px;
+          background: #1a1a24;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          padding: 12px 14px;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+          pointer-events: none;
+        }
+        .cal-day-preview--left { left: 0; }
+        .cal-day-preview--right { right: 0; }
+        .cal-preview-date {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+          color: rgba(240,237,230,0.35);
+          margin-bottom: 8px;
+        }
+        .cal-preview-row {
+          display: flex; gap: 8px; align-items: baseline;
+          margin-bottom: 5px;
+        }
+        .cal-preview-hour {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px; color: #FFD700; opacity: 0.7;
+          white-space: nowrap; min-width: 44px;
+        }
+        .cal-preview-items {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px; color: rgba(240,237,230,0.65);
+          line-height: 1.4;
+        }
+        .cal-preview-empty {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px; color: rgba(240,237,230,0.25);
+          font-style: italic;
+        }
+
         .cal-day.past .cal-day-num {
           text-decoration: line-through;
           color: rgba(240,237,230,0.25);
@@ -2110,17 +2154,34 @@ export default function LifestylePlan() {
                       const [dy, dm, dd] = iso.split("-").map(Number);
                       const dow = new Date(Date.UTC(dy, dm - 1, dd)).getUTCDay();
                       const isPayday = dow === 5 && iso >= "2026-04-17";
+                      const previewTasks = HOURS
+                        .filter(h => (tasks[iso]?.[h] || []).length > 0)
+                        .map(h => ({ hour: h, items: tasks[iso][h] }));
+                      // Align tooltip: right edge for Fri/Sat, left edge otherwise
+                      const tipAlign = dow >= 5 ? "right" : "left";
                       return (
                         <div
                           key={di}
                           className={`cal-day${isPast ? " past" : ""}${isToday ? " today" : ""}${isSelected ? " selected" : ""}${isPayday ? " payday" : ""}`}
-                          onClick={() => {
-                            setPlannerDate(iso);
-                            setPlannerMode("day");
-                          }}
+                          onClick={() => { setPlannerDate(iso); setPlannerMode("day"); }}
+                          onMouseEnter={() => setCalHoverDay(iso)}
+                          onMouseLeave={() => setCalHoverDay(null)}
                         >
                           <span className="cal-day-num">{dayNum}</span>
                           {hasTasks && <div className="cal-task-dot" />}
+                          {calHoverDay === iso && (
+                            <div className={`cal-day-preview cal-day-preview--${tipAlign}`}>
+                              <div className="cal-preview-date">{formatDateLabel(iso)}</div>
+                              {previewTasks.length > 0 ? previewTasks.map(({ hour, items }) => (
+                                <div key={hour} className="cal-preview-row">
+                                  <span className="cal-preview-hour">{formatHour(hour)}</span>
+                                  <span className="cal-preview-items">{items.join(", ")}</span>
+                                </div>
+                              )) : (
+                                <div className="cal-preview-empty">Nothing planned</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
