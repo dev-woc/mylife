@@ -699,6 +699,13 @@ export default function LifestylePlan() {
           min-height: 100vh;
         }
 
+        .day-sticky-header {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background: #F5EEE6;
+        }
+
         .planner-date-nav {
           display: flex;
           align-items: center;
@@ -706,9 +713,6 @@ export default function LifestylePlan() {
           padding: 28px 40px 24px;
           background: #F5EEE6;
           border-bottom: 1px solid rgba(44,31,20,0.08);
-          position: sticky;
-          top: 0;
-          z-index: 10;
         }
 
         .planner-nav-btn {
@@ -1207,21 +1211,22 @@ export default function LifestylePlan() {
         </>
       ) : (
         <div className="day-canvas">
-          <div className="planner-date-nav">
-            <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, -1))}>←</button>
-            <div className="planner-date-center">
-              <button className="day-back-btn" onClick={() => setPlannerMode("calendar")}>← Calendar</button>
-              <div className="planner-date-label" style={{marginTop: 4}}>{formatDateLabel(plannerDate)}</div>
-              <div className="planner-task-count">
-                {syncing ? "syncing…" : totalTaskCount === 0 ? "Nothing planned" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
+          <div className="day-sticky-header">
+            <div className="planner-date-nav">
+              <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, -1))}>←</button>
+              <div className="planner-date-center">
+                <button className="day-back-btn" onClick={() => setPlannerMode("calendar")}>← Calendar</button>
+                <div className="planner-date-label" style={{marginTop: 4}}>{formatDateLabel(plannerDate)}</div>
+                <div className="planner-task-count">
+                  {syncing ? "syncing…" : totalTaskCount === 0 ? "Nothing planned" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
+                </div>
               </div>
+              <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, 1))}>→</button>
             </div>
-            <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, 1))}>→</button>
-          </div>
-
-          <div className="day-tab-bar">
-            <button className={`day-tab-btn${dayTab === "schedule" ? " active" : ""}`} onClick={() => setDayTab("schedule")}>Schedule</button>
-            <button className={`day-tab-btn${dayTab === "map" ? " active" : ""}`} onClick={() => setDayTab("map")}>Map</button>
+            <div className="day-tab-bar">
+              <button className={`day-tab-btn${dayTab === "schedule" ? " active" : ""}`} onClick={() => setDayTab("schedule")}>Schedule</button>
+              <button className={`day-tab-btn${dayTab === "map" ? " active" : ""}`} onClick={() => setDayTab("map")}>Map</button>
+            </div>
           </div>
 
           {dayTab === "map" ? (
