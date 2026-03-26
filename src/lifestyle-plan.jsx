@@ -290,6 +290,8 @@ export default function LifestylePlan() {
   const [todoInput, setTodoInput] = useState("");
   const [todoEditing, setTodoEditing] = useState(null); // id
   const [todoEditValue, setTodoEditValue] = useState("");
+  const [editingTodoTime, setEditingTodoTime] = useState(null); // id
+  const [todoTimeForm, setTodoTimeForm] = useState({ start_hour: 9, end_hour: 10 });
 
   const gridRef = useRef(null);
 
@@ -355,10 +357,23 @@ export default function LifestylePlan() {
     const newList = [...(updated[date][hour] || []), trimmed];
     updated[date][hour] = newList;
     saveTasks(updated, date, hour, newList);
+    // Mirror to todo list (skip if already there)
+    if (date === plannerDate) {
+      setTodos(prev => {
+        if (prev.some(t => t.text === trimmed && Number(t.start_hour) === Number(hour))) return prev;
+        fetch("/api/todos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date, text: trimmed, start_hour: hour, end_hour: Number(hour) + 1 }),
+        }).then(r => r.json()).then(todo => setTodos(p => [...p, todo])).catch(() => {});
+        return prev; // will be updated by the fetch above
+      });
+    }
   }
 
   function editTask(date, hour, index, value) {
     const trimmed = value.trim();
+    const oldText = tasks[date]?.[hour]?.[index];
     const updated = { ...tasks };
     if (!updated[date]?.[hour]) return;
     let newList;
@@ -371,6 +386,13 @@ export default function LifestylePlan() {
       } else {
         updated[date][hour] = newList;
       }
+      // Clean up link + todo when task is deleted via edit
+      if (oldText) {
+        const link = getTaskLink(hour, oldText);
+        if (link) unlinkTask(link.id);
+        const todo = todos.find(t => t.text === oldText && Number(t.start_hour) === Number(hour));
+        if (todo) deleteTodo(todo.id);
+      }
     } else {
       newList = updated[date][hour].map((t, i) => i === index ? trimmed : t);
       updated[date][hour] = newList;
@@ -379,6 +401,7 @@ export default function LifestylePlan() {
   }
 
   function deleteTask(date, hour, index) {
+    const taskText = tasks[date]?.[hour]?.[index];
     const updated = { ...tasks };
     if (!updated[date]?.[hour]) return;
     const newList = updated[date][hour].filter((_, i) => i !== index);
@@ -389,6 +412,14 @@ export default function LifestylePlan() {
       updated[date][hour] = newList;
     }
     saveTasks(updated, date, hour, newList);
+    if (taskText) {
+      // Remove associated task-stop link
+      const link = getTaskLink(hour, taskText);
+      if (link) unlinkTask(link.id);
+      // Remove associated todo
+      const todo = todos.find(t => t.text === taskText && Number(t.start_hour) === Number(hour));
+      if (todo) deleteTodo(todo.id);
+    }
   }
 
   function commitAdd() {
@@ -410,7 +441,10 @@ export default function LifestylePlan() {
   function getTaskLink(hour, taskText, blockId = null) {
     return taskLinks.find(l =>
       l.task_text === taskText &&
-      (blockId ? l.block_id === blockId : l.hour === hour)
+      (blockId != null
+        ? l.block_id == blockId
+        // match by exact hour OR by a "global" link (hour=null, block_id=null) created from the map
+        : l.hour == hour || (l.hour == null && l.block_id == null))
     ) || null;
   }
 
@@ -468,7 +502,19 @@ export default function LifestylePlan() {
   function commitBlockAdd() {
     if (!blockAddingId || !blockAddingValue.trim()) { setBlockAddingId(null); setBlockAddingValue(""); return; }
     const block = blocks.find(b => b.id === blockAddingId);
-    if (block) updateBlockTasks(blockAddingId, [...block.tasks, blockAddingValue.trim()]);
+    const trimmed = blockAddingValue.trim();
+    if (block) {
+      updateBlockTasks(blockAddingId, [...block.tasks, trimmed]);
+      // Mirror to todo list
+      const alreadyExists = todos.some(t => t.text === trimmed && Number(t.start_hour) === Number(block.start_hour));
+      if (!alreadyExists) {
+        fetch("/api/todos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: plannerDate, text: trimmed, start_hour: block.start_hour, end_hour: block.end_hour, block_id: blockAddingId }),
+        }).then(r => r.json()).then(todo => setTodos(p => [...p, todo])).catch(() => {});
+      }
+    }
     setBlockAddingId(null);
     setBlockAddingValue("");
   }
@@ -521,12 +567,63 @@ export default function LifestylePlan() {
   }
 
   async function deleteTodo(id) {
+    const todo = todos.find(t => t.id === id);
     setTodos(prev => prev.filter(t => t.id !== id));
     await fetch("/api/todos", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
+    // If the todo owned a block, delete that block too
+    if (todo?.block_id) {
+      await fetch("/api/blocks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: todo.block_id }),
+      });
+      setBlocks(prev => prev.filter(b => b.id !== todo.block_id));
+    }
+  }
+
+  async function setTodoTime(id, start_hour, end_hour) {
+    const todo = todos.find(t => t.id === id);
+    if (!todo) return;
+    const duration = end_hour - start_hour;
+    // Delete old block if it existed
+    if (todo.block_id) {
+      await fetch("/api/blocks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: todo.block_id }) });
+      setBlocks(prev => prev.filter(b => b.id !== todo.block_id));
+    }
+    let newBlockId = null;
+    if (duration > 1) {
+      // Create merged block
+      const bRes = await fetch("/api/blocks", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: plannerDate, start_hour, end_hour, label: todo.text }),
+      });
+      const block = await bRes.json();
+      await fetch("/api/blocks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: block.id, tasks: [todo.text] }) });
+      setBlocks(prev => [...prev.filter(b => b.id !== block.id), { ...block, tasks: [todo.text] }].sort((a, b) => a.start_hour - b.start_hour));
+      newBlockId = block.id;
+    } else {
+      // Single-hour: add to slot tasks
+      addTask(plannerDate, start_hour, todo.text);
+    }
+    await fetch("/api/todos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, start_hour, end_hour, block_id: newBlockId }) });
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, start_hour, end_hour, block_id: newBlockId } : t));
+    setEditingTodoTime(null);
+  }
+
+  async function clearTodoTime(id) {
+    const todo = todos.find(t => t.id === id);
+    if (!todo) return;
+    if (todo.block_id) {
+      await fetch("/api/blocks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: todo.block_id }) });
+      setBlocks(prev => prev.filter(b => b.id !== todo.block_id));
+    }
+    await fetch("/api/todos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, start_hour: null, end_hour: null, block_id: null }) });
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, start_hour: null, end_hour: null, block_id: null } : t));
+    setEditingTodoTime(null);
   }
 
   const dayTasks = tasks[plannerDate] || {};
@@ -1444,6 +1541,51 @@ export default function LifestylePlan() {
         .todo-add-input:focus { border-bottom-color: #C0733A; }
         .todo-add-input::placeholder { color: rgba(44,31,20,0.28); }
 
+        .todo-time-badge {
+          background: none; border: none; cursor: pointer; padding: 0;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px; font-weight: 500; letter-spacing: 0.5px;
+          color: #C0733A;
+          white-space: nowrap; flex-shrink: 0;
+          transition: opacity 0.1s;
+        }
+        .todo-time-badge:hover { opacity: 0.7; }
+        .todo-unassigned {
+          background: none; border: 1px dashed rgba(44,31,20,0.18); border-radius: 10px;
+          padding: 1px 7px; cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px; color: rgba(44,31,20,0.35);
+          white-space: nowrap; flex-shrink: 0;
+          transition: all 0.1s;
+        }
+        .todo-unassigned:hover { border-color: #C0733A; color: #C0733A; }
+        .todo-time-editor {
+          display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+          padding: 6px 8px 6px 36px;
+          background: rgba(192,115,58,0.05);
+          border-radius: 6px; margin-top: 2px;
+        }
+        .todo-time-select {
+          background: #F5EEE6; border: 1px solid rgba(44,31,20,0.15);
+          border-radius: 5px; padding: 3px 5px;
+          font-family: 'DM Sans', sans-serif; font-size: 11px; color: #2C1F14;
+          outline: none; cursor: pointer;
+        }
+        .todo-time-select:focus { border-color: #C0733A; }
+        .todo-time-save {
+          background: #2C1F14; color: #F5EEE6; border: none; border-radius: 5px;
+          padding: 3px 8px; font-family: 'DM Sans', sans-serif;
+          font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+          cursor: pointer; transition: opacity 0.1s;
+        }
+        .todo-time-save:hover { opacity: 0.8; }
+        .todo-time-clear {
+          background: none; border: none; color: rgba(44,31,20,0.3);
+          font-size: 11px; cursor: pointer; padding: 0;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .todo-time-clear:hover { color: #C0392B; }
+
         @media (max-width: 768px) {
           .day-body { flex-direction: column; }
           .todo-panel {
@@ -2049,31 +2191,66 @@ export default function LifestylePlan() {
                 <div className="todo-progress-fill" style={{ width: todos.length ? `${Math.round(doneTodos / todos.length * 100)}%` : "0%" }} />
               </div>
               <div className="todo-list">
-                {todos.map(todo => (
-                  <div key={todo.id} className={`todo-item${todo.done ? " done" : ""}`}>
-                    <button className="todo-check" onClick={() => toggleTodo(todo.id, !todo.done)}>
-                      <span className="todo-check-mark">✓</span>
-                    </button>
-                    {todoEditing === todo.id ? (
-                      <input
-                        autoFocus
-                        className="todo-text-input"
-                        value={todoEditValue}
-                        onChange={e => setTodoEditValue(e.target.value)}
-                        onBlur={() => { renameTodo(todo.id, todoEditValue); setTodoEditing(null); }}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") { renameTodo(todo.id, todoEditValue); setTodoEditing(null); }
-                          if (e.key === "Escape") setTodoEditing(null);
-                        }}
-                      />
-                    ) : (
-                      <span className="todo-text" onDoubleClick={() => { setTodoEditing(todo.id); setTodoEditValue(todo.text); }}>
-                        {todo.text}
-                      </span>
-                    )}
-                    <button className="todo-delete" onMouseDown={e => { e.preventDefault(); deleteTodo(todo.id); }}>×</button>
-                  </div>
-                ))}
+                {todos.map(todo => {
+                  const hasTimed = todo.start_hour != null;
+                  const isEditingTime = editingTodoTime === todo.id;
+                  return (
+                    <div key={todo.id} className={`todo-item${todo.done ? " done" : ""}`} style={{flexWrap:"wrap"}}>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:10,width:"100%"}}>
+                        <button className="todo-check" onClick={() => toggleTodo(todo.id, !todo.done)}>
+                          <span className="todo-check-mark">✓</span>
+                        </button>
+                        {todoEditing === todo.id ? (
+                          <input
+                            autoFocus
+                            className="todo-text-input"
+                            value={todoEditValue}
+                            onChange={e => setTodoEditValue(e.target.value)}
+                            onBlur={() => { renameTodo(todo.id, todoEditValue); setTodoEditing(null); }}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") { renameTodo(todo.id, todoEditValue); setTodoEditing(null); }
+                              if (e.key === "Escape") setTodoEditing(null);
+                            }}
+                          />
+                        ) : (
+                          <span className="todo-text" style={{flex:1}} onDoubleClick={() => { setTodoEditing(todo.id); setTodoEditValue(todo.text); }}>
+                            {todo.text}
+                          </span>
+                        )}
+                        {hasTimed ? (
+                          <button className="todo-time-badge" onClick={() => {
+                            setEditingTodoTime(isEditingTime ? null : todo.id);
+                            setTodoTimeForm({ start_hour: Number(todo.start_hour), end_hour: Number(todo.end_hour) });
+                          }}>
+                            {formatHour(Number(todo.start_hour))}–{formatHour(Number(todo.end_hour))}
+                          </button>
+                        ) : (
+                          <button className="todo-unassigned" onClick={() => {
+                            setEditingTodoTime(isEditingTime ? null : todo.id);
+                            setTodoTimeForm({ start_hour: 9, end_hour: 10 });
+                          }}>Unassigned</button>
+                        )}
+                        <button className="todo-delete" onMouseDown={e => { e.preventDefault(); deleteTodo(todo.id); }}>×</button>
+                      </div>
+                      {isEditingTime && (
+                        <div className="todo-time-editor">
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(44,31,20,0.4)",letterSpacing:1,textTransform:"uppercase"}}>From</span>
+                          <select className="todo-time-select" value={todoTimeForm.start_hour}
+                            onChange={e => setTodoTimeForm(f => ({ ...f, start_hour: Number(e.target.value), end_hour: Math.max(Number(e.target.value) + 1, f.end_hour) }))}>
+                            {HOURS.map(h => <option key={h} value={h}>{formatHour(h)}</option>)}
+                          </select>
+                          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:10,color:"rgba(44,31,20,0.4)",letterSpacing:1,textTransform:"uppercase"}}>To</span>
+                          <select className="todo-time-select" value={todoTimeForm.end_hour}
+                            onChange={e => setTodoTimeForm(f => ({ ...f, end_hour: Number(e.target.value) }))}>
+                            {HOURS.filter(h => h > todoTimeForm.start_hour).map(h => <option key={h} value={h}>{formatHour(h)}</option>)}
+                          </select>
+                          <button className="todo-time-save" onClick={() => setTodoTime(todo.id, todoTimeForm.start_hour, todoTimeForm.end_hour)}>Set</button>
+                          {hasTimed && <button className="todo-time-clear" onClick={() => clearTodoTime(todo.id)}>Clear</button>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <div className="todo-add-row">
                 <input
