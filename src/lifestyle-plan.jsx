@@ -688,92 +688,133 @@ export default function LifestylePlan() {
           background: rgba(240,237,230,0.4);
         }
 
-        /* Day Planner */
+        /* Day View — Canvas-inspired warm editorial */
+        .day-canvas {
+          background: #F5EEE6;
+          min-height: 100vh;
+        }
+
         .planner-date-nav {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 20px 32px;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
+          padding: 28px 40px 24px;
+          background: #F5EEE6;
+          border-bottom: 1px solid rgba(44,31,20,0.08);
+          position: sticky;
+          top: 0;
+          z-index: 10;
         }
 
         .planner-nav-btn {
           background: none;
           border: none;
-          color: rgba(240,237,230,0.4);
-          font-size: 22px;
+          color: rgba(44,31,20,0.3);
+          font-size: 20px;
           cursor: pointer;
-          padding: 4px 10px;
+          padding: 6px 12px;
           transition: color 0.15s;
           line-height: 1;
           font-family: 'DM Sans', sans-serif;
+          border-radius: 50%;
         }
 
         .planner-nav-btn:hover {
-          color: rgba(240,237,230,0.9);
+          color: rgba(44,31,20,0.8);
+          background: rgba(44,31,20,0.06);
         }
 
         .planner-date-center {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
         }
 
         .planner-date-label {
           font-family: 'Playfair Display', serif;
-          font-size: clamp(22px, 4vw, 36px);
-          font-weight: 700;
-          color: #F0EDE6;
+          font-size: clamp(26px, 5vw, 48px);
+          font-weight: 900;
+          color: #2C1F14;
           line-height: 1;
+          letter-spacing: -0.5px;
         }
 
         .planner-task-count {
           font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          letter-spacing: 2px;
-          color: rgba(240,237,230,0.25);
+          font-size: 10px;
+          letter-spacing: 3px;
+          color: rgba(44,31,20,0.35);
           text-transform: uppercase;
         }
 
         .planner-time-grid {
           animation: slideUp 0.25s ease;
+          padding-bottom: 60px;
+        }
+
+        .day-section {
+          margin-bottom: 0;
+        }
+
+        .day-section-header {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 24px 40px 12px;
+        }
+
+        .day-section-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 4px;
+          text-transform: uppercase;
+          color: rgba(44,31,20,0.35);
+          white-space: nowrap;
+        }
+
+        .day-section-rule {
+          flex: 1;
+          height: 1px;
+          background: rgba(44,31,20,0.1);
         }
 
         .time-row {
           display: flex;
           align-items: flex-start;
-          padding: 10px 32px;
+          padding: 6px 40px;
           gap: 0;
-          min-height: 44px;
-          transition: background 0.1s;
+          min-height: 48px;
+          transition: background 0.12s;
+          cursor: default;
         }
 
-        .time-row:nth-child(odd) {
-          background: rgba(255,255,255,0.015);
+        .time-row:hover {
+          background: rgba(44,31,20,0.025);
         }
 
         .time-row.has-tasks {
-          border-left: 2px solid rgba(255,215,0,0.2);
-          padding-left: 30px;
+          padding-top: 10px;
+          padding-bottom: 10px;
         }
 
         .time-label {
           font-family: 'DM Sans', sans-serif;
           font-size: 11px;
-          letter-spacing: 2px;
-          color: rgba(240,237,230,0.22);
-          width: 54px;
-          min-width: 54px;
+          letter-spacing: 1.5px;
+          color: rgba(44,31,20,0.3);
+          width: 52px;
+          min-width: 52px;
           text-align: right;
-          padding-top: 5px;
+          padding-top: 6px;
           text-transform: uppercase;
         }
 
         .time-divider {
           width: 1px;
-          background: rgba(255,255,255,0.07);
-          margin: 0 16px;
+          background: rgba(44,31,20,0.1);
+          margin: 0 20px;
           align-self: stretch;
           min-height: 24px;
         }
@@ -781,86 +822,95 @@ export default function LifestylePlan() {
         .task-area {
           display: flex;
           flex-wrap: wrap;
-          gap: 6px;
-          align-items: center;
+          gap: 8px;
+          align-items: flex-start;
           flex: 1;
           padding: 2px 0;
         }
 
         .task-chip {
           display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 2px;
-          padding: 4px 10px;
+          align-items: flex-start;
+          gap: 8px;
+          background: #FFFBF7;
+          border: 1px solid rgba(44,31,20,0.1);
+          border-radius: 8px;
+          padding: 8px 12px;
           font-family: 'DM Sans', sans-serif;
           font-size: 13px;
-          color: rgba(240,237,230,0.8);
+          color: #2C1F14;
           cursor: pointer;
-          transition: background 0.1s, border-color 0.1s;
+          transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
           user-select: none;
+          box-shadow: 0 1px 3px rgba(44,31,20,0.07), 0 1px 2px rgba(44,31,20,0.04);
+          max-width: 340px;
         }
 
         .task-chip:hover {
-          background: rgba(255,255,255,0.09);
-          border-color: rgba(255,255,255,0.15);
+          box-shadow: 0 4px 12px rgba(44,31,20,0.12);
+          border-color: rgba(44,31,20,0.18);
+          transform: translateY(-1px);
         }
 
         .task-chip-text {
-          line-height: 1.5;
+          line-height: 1.55;
           white-space: pre-wrap;
+          flex: 1;
         }
 
         .task-chip-delete {
-          color: rgba(240,237,230,0.25);
-          font-size: 14px;
-          line-height: 1;
+          color: rgba(44,31,20,0.2);
+          font-size: 16px;
+          line-height: 1.2;
           transition: color 0.1s;
-          padding: 0 2px;
+          flex-shrink: 0;
+          margin-top: 1px;
         }
 
         .task-chip:hover .task-chip-delete {
-          color: rgba(240,237,230,0.6);
+          color: rgba(44,31,20,0.45);
         }
 
         .task-chip-delete:hover {
-          color: #FF4E50 !important;
+          color: #C0392B !important;
         }
 
         .task-add-btn {
           background: none;
-          border: none;
+          border: 1px dashed rgba(44,31,20,0.18);
+          border-radius: 8px;
           font-family: 'DM Sans', sans-serif;
           font-size: 11px;
           letter-spacing: 2px;
-          color: rgba(240,237,230,0.18);
+          color: rgba(44,31,20,0.25);
           cursor: pointer;
           text-transform: uppercase;
-          padding: 4px 6px;
-          transition: color 0.15s;
+          padding: 6px 12px;
+          transition: all 0.15s;
         }
 
         .task-add-btn:hover {
-          color: rgba(240,237,230,0.55);
+          border-color: rgba(44,31,20,0.4);
+          color: rgba(44,31,20,0.6);
+          background: rgba(44,31,20,0.03);
         }
 
         .task-inline-input {
-          background: rgba(255,255,255,0.06);
-          border: none;
-          border-bottom: 1px solid #FFD700;
-          color: #F0EDE6;
+          background: #FFFBF7;
+          border: 1px solid rgba(44,31,20,0.15);
+          border-bottom: 2px solid #C0733A;
+          color: #2C1F14;
           font-family: 'DM Sans', sans-serif;
           font-size: 13px;
           outline: none;
-          padding: 4px 8px;
-          width: 220px;
-          min-height: 28px;
-          border-radius: 0;
+          padding: 8px 12px;
+          width: 240px;
+          min-height: 36px;
+          border-radius: 8px;
           resize: none;
           overflow: hidden;
-          line-height: 1.5;
+          line-height: 1.55;
+          box-shadow: 0 2px 8px rgba(44,31,20,0.08);
         }
 
         /* Calendar */
@@ -972,16 +1022,16 @@ export default function LifestylePlan() {
           background: none;
           border: none;
           font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          letter-spacing: 2px;
+          font-size: 10px;
+          letter-spacing: 3px;
           text-transform: uppercase;
-          color: rgba(240,237,230,0.35);
+          color: rgba(44,31,20,0.4);
           cursor: pointer;
           padding: 0;
           transition: color 0.15s;
         }
 
-        .day-back-btn:hover { color: rgba(240,237,230,0.8); }
+        .day-back-btn:hover { color: rgba(44,31,20,0.75); }
       `}</style>
 
       <div className="plan-header">
@@ -1121,126 +1171,119 @@ export default function LifestylePlan() {
           </div>
         </>
       ) : (
-        <>
+        <div className="day-canvas">
           <div className="planner-date-nav">
-            <button
-              className="planner-nav-btn"
-              onClick={() => setPlannerDate(d => shiftDate(d, -1))}
-            >
-              ←
-            </button>
+            <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, -1))}>←</button>
             <div className="planner-date-center">
-              <button className="day-back-btn" onClick={() => setPlannerMode("calendar")}>
-                ← Calendar
-              </button>
-              <div className="planner-date-label" style={{marginTop: 6}}>{formatDateLabel(plannerDate)}</div>
+              <button className="day-back-btn" onClick={() => setPlannerMode("calendar")}>← Calendar</button>
+              <div className="planner-date-label" style={{marginTop: 4}}>{formatDateLabel(plannerDate)}</div>
               <div className="planner-task-count">
-                {syncing ? "syncing..." : totalTaskCount === 0 ? "No tasks yet" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
+                {syncing ? "syncing…" : totalTaskCount === 0 ? "Nothing planned" : `${totalTaskCount} task${totalTaskCount === 1 ? "" : "s"}`}
               </div>
             </div>
-            <button
-              className="planner-nav-btn"
-              onClick={() => setPlannerDate(d => shiftDate(d, 1))}
-            >
-              →
-            </button>
+            <button className="planner-nav-btn" onClick={() => setPlannerDate(d => shiftDate(d, 1))}>→</button>
           </div>
 
           <div className="planner-time-grid" ref={gridRef}>
-            {HOURS.map((hour) => {
-              const slotTasks = getSlotTasks(plannerDate, hour);
-              const isAdding = addingSlot?.date === plannerDate && addingSlot?.hour === hour;
-              const hasTasks = slotTasks.length > 0;
+            {[
+              { label: "Morning",   hours: HOURS.filter(h => h < 12) },
+              { label: "Afternoon", hours: HOURS.filter(h => h >= 12 && h < 18) },
+              { label: "Evening",   hours: HOURS.filter(h => h >= 18) },
+            ].map(({ label, hours }) => (
+              <div key={label} className="day-section">
+                <div className="day-section-header">
+                  <span className="day-section-label">{label}</span>
+                  <div className="day-section-rule" />
+                </div>
+                {hours.map((hour) => {
+                  const slotTasks = getSlotTasks(plannerDate, hour);
+                  const isAdding = addingSlot?.date === plannerDate && addingSlot?.hour === hour;
+                  const hasTasks = slotTasks.length > 0;
 
-              return (
-                <div
-                  key={hour}
-                  className={`time-row${hasTasks ? " has-tasks" : ""}`}
-                >
-                  <div className="time-label">{formatHour(hour)}</div>
-                  <div className="time-divider" />
-                  <div className="task-area">
-                    {slotTasks.map((task, idx) => {
-                      const isEditing =
-                        editingSlot?.date === plannerDate &&
-                        editingSlot?.hour === hour &&
-                        editingSlot?.index === idx;
+                  return (
+                    <div key={hour} className={`time-row${hasTasks ? " has-tasks" : ""}`}>
+                      <div className="time-label">{formatHour(hour)}</div>
+                      <div className="time-divider" />
+                      <div className="task-area">
+                        {slotTasks.map((task, idx) => {
+                          const isEditing =
+                            editingSlot?.date === plannerDate &&
+                            editingSlot?.hour === hour &&
+                            editingSlot?.index === idx;
 
-                      if (isEditing) {
-                        return (
+                          if (isEditing) {
+                            return (
+                              <textarea
+                                key={idx}
+                                autoFocus
+                                className="task-inline-input"
+                                value={editingValue}
+                                rows={editingValue.split("\n").length || 1}
+                                onChange={e => setEditingValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); }
+                                  if (e.key === "Escape") { setEditingSlot(null); setEditingValue(""); }
+                                }}
+                                onBlur={commitEdit}
+                              />
+                            );
+                          }
+
+                          return (
+                            <div
+                              key={idx}
+                              className="task-chip"
+                              onClick={() => {
+                                setAddingSlot(null);
+                                setEditingSlot({ date: plannerDate, hour, index: idx });
+                                setEditingValue(task);
+                              }}
+                            >
+                              <span className="task-chip-text">{task}</span>
+                              <span
+                                className="task-chip-delete"
+                                onMouseDown={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  deleteTask(plannerDate, hour, idx);
+                                }}
+                              >×</span>
+                            </div>
+                          );
+                        })}
+
+                        {isAdding ? (
                           <textarea
-                            key={idx}
                             autoFocus
                             className="task-inline-input"
-                            value={editingValue}
-                            rows={editingValue.split("\n").length || 1}
-                            onChange={e => setEditingValue(e.target.value)}
+                            value={addingValue}
+                            rows={addingValue.split("\n").length || 1}
+                            onChange={e => setAddingValue(e.target.value)}
                             onKeyDown={e => {
-                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); }
-                              if (e.key === "Escape") { setEditingSlot(null); setEditingValue(""); }
+                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); }
+                              if (e.key === "Escape") { setAddingSlot(null); setAddingValue(""); }
                             }}
-                            onBlur={commitEdit}
+                            onBlur={commitAdd}
+                            placeholder="Add task… (Shift+Enter for new line)"
                           />
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={idx}
-                          className="task-chip"
-                          onClick={() => {
-                            setAddingSlot(null);
-                            setEditingSlot({ date: plannerDate, hour, index: idx });
-                            setEditingValue(task);
-                          }}
-                        >
-                          <span className="task-chip-text">{task}</span>
-                          <span
-                            className="task-chip-delete"
-                            onMouseDown={e => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              deleteTask(plannerDate, hour, idx);
+                        ) : (
+                          <button
+                            className="task-add-btn"
+                            onClick={() => {
+                              setEditingSlot(null);
+                              setAddingSlot({ date: plannerDate, hour });
+                              setAddingValue("");
                             }}
-                          >
-                            ×
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                    {isAdding ? (
-                      <textarea
-                        autoFocus
-                        className="task-inline-input"
-                        value={addingValue}
-                        rows={addingValue.split("\n").length || 1}
-                        onChange={e => setAddingValue(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); }
-                          if (e.key === "Escape") { setAddingSlot(null); setAddingValue(""); }
-                        }}
-                        onBlur={commitAdd}
-                        placeholder="Add task... (Shift+Enter for new line)"
-                      />
-                    ) : (
-                      <button
-                        className="task-add-btn"
-                        onClick={() => {
-                          setEditingSlot(null);
-                          setAddingSlot({ date: plannerDate, hour });
-                          setAddingValue("");
-                        }}
-                      >
-                        + add
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                          >+ add</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
