@@ -603,7 +603,8 @@ export default function LifestylePlan() {
   async function setTodoTime(id, start_hour, end_hour) {
     const todo = todos.find(t => t.id === id);
     if (!todo) return;
-    const duration = end_hour - start_hour;
+    // Count actual HOURS slots in range (not arithmetic duration) — e.g. 6→7 covers [6, 6.5] = 2 slots
+    const slotsInRange = HOURS.filter(h => h >= start_hour && h < end_hour);
     // Remove old schedule entry before writing new one
     if (todo.block_id) {
       await fetch("/api/blocks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: todo.block_id }) });
@@ -620,7 +621,7 @@ export default function LifestylePlan() {
       }
     }
     let newBlockId = null;
-    if (duration > 1) {
+    if (slotsInRange.length > 1) {
       // Create merged block
       const bRes = await fetch("/api/blocks", {
         method: "POST", headers: { "Content-Type": "application/json" },
