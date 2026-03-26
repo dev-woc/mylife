@@ -172,13 +172,23 @@ const months = [
 
 const budgetDots = { "$": 1, "$$": 2, "$$$": 3 };
 
-const HOURS = Array.from({ length: 19 }, (_, i) => i + 5); // 5am–11pm
+// 30-min slots for 5–7am and 8–11pm; hourly otherwise
+const HOURS = [
+  5, 5.5, 6, 6.5, 7,
+  8, 9, 10, 11,
+  12, 13, 14, 15, 16, 17, 18, 19,
+  20, 20.5, 21, 21.5, 22, 22.5, 23,
+];
 
 function formatHour(h) {
-  if (h === 0) return "12 AM";
-  if (h < 12) return `${h} AM`;
-  if (h === 12) return "12 PM";
-  return `${h - 12} PM`;
+  const whole = Math.floor(h);
+  const half  = h % 1 !== 0;
+  const suffix = whole < 12 ? "AM" : "PM";
+  const display = whole === 0 ? 12 : whole > 12 ? whole - 12 : whole;
+  if (half) return `${display}:30 ${suffix}`;
+  if (whole === 0)  return "12 AM";
+  if (whole === 12) return "12 PM";
+  return `${display} ${suffix}`;
 }
 
 function todayISO() {
@@ -275,6 +285,12 @@ export default function LifestylePlan() {
   const [taskLinks, setTaskLinks] = useState([]);
   const [linkingTask, setLinkingTask] = useState(null); // { hour, blockId, taskText }
 
+  // Todos
+  const [todos, setTodos] = useState([]);
+  const [todoInput, setTodoInput] = useState("");
+  const [todoEditing, setTodoEditing] = useState(null); // id
+  const [todoEditValue, setTodoEditValue] = useState("");
+
   const gridRef = useRef(null);
 
   // Reset + reload day data when date changes
@@ -284,12 +300,15 @@ export default function LifestylePlan() {
     setDayStops([]);
     setTaskLinks([]);
     setLinkingTask(null);
+    setTodos([]);
     fetch(`/api/blocks?date=${plannerDate}`)
       .then(r => r.json()).then(d => setBlocks(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/stops?date=${plannerDate}`)
       .then(r => r.json()).then(d => setDayStops(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/task-links?date=${plannerDate}`)
       .then(r => r.json()).then(d => setTaskLinks(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`/api/todos?date=${plannerDate}`)
+      .then(r => r.json()).then(d => setTodos(Array.isArray(d) ? d : [])).catch(() => {});
   }, [plannerDate]);
 
   // Load from DB when entering day view
@@ -311,7 +330,7 @@ export default function LifestylePlan() {
   useEffect(() => {
     if (plannerMode === "day" && gridRef.current) {
       const rows = gridRef.current.querySelectorAll(".time-row");
-      if (rows[2]) rows[2].scrollIntoView({ block: "start" });
+      if (rows[4]) rows[4].scrollIntoView({ block: "start" });
     }
   }, [plannerMode]);
 
@@ -469,8 +488,50 @@ export default function LifestylePlan() {
     setBlockEditingValue("");
   }
 
+  async function addTodo(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const res = await fetch("/api/todos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: plannerDate, text: trimmed }),
+    });
+    const todo = await res.json();
+    setTodos(prev => [...prev, todo]);
+  }
+
+  async function toggleTodo(id, done) {
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, done } : t));
+    await fetch("/api/todos", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, done }),
+    });
+  }
+
+  async function renameTodo(id, text) {
+    const trimmed = text.trim();
+    if (!trimmed) return deleteTodo(id);
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, text: trimmed } : t));
+    await fetch("/api/todos", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, text: trimmed }),
+    });
+  }
+
+  async function deleteTodo(id) {
+    setTodos(prev => prev.filter(t => t.id !== id));
+    await fetch("/api/todos", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+  }
+
   const dayTasks = tasks[plannerDate] || {};
   const totalTaskCount = Object.values(dayTasks).reduce((sum, arr) => sum + arr.length, 0);
+  const doneTodos = todos.filter(t => t.done).length;
 
   return (
     <div style={{
@@ -874,7 +935,15 @@ export default function LifestylePlan() {
           text-transform: uppercase;
         }
 
+        .day-body {
+          display: flex;
+          align-items: flex-start;
+          gap: 0;
+        }
+
         .planner-time-grid {
+          flex: 1;
+          min-width: 0;
           animation: slideUp 0.25s ease;
           padding-bottom: 60px;
         }
@@ -1219,6 +1288,172 @@ export default function LifestylePlan() {
           outline: none;
           cursor: pointer;
           max-width: 160px;
+        }
+
+        /* Todo panel */
+        .todo-panel {
+          width: 260px;
+          min-width: 260px;
+          flex-shrink: 0;
+          background: #FFFBF7;
+          border-left: 1px solid rgba(44,31,20,0.08);
+          min-height: calc(100vh - 180px);
+          display: flex;
+          flex-direction: column;
+          padding: 28px 20px 40px;
+          position: sticky;
+          top: 0;
+          max-height: 100vh;
+          overflow-y: auto;
+        }
+
+        .todo-panel-title {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          color: rgba(44,31,20,0.35);
+          margin-bottom: 4px;
+        }
+
+        .todo-progress-bar {
+          height: 2px;
+          background: rgba(44,31,20,0.08);
+          border-radius: 2px;
+          margin-bottom: 18px;
+          overflow: hidden;
+        }
+
+        .todo-progress-fill {
+          height: 100%;
+          background: #C0733A;
+          border-radius: 2px;
+          transition: width 0.3s ease;
+        }
+
+        .todo-list {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          flex: 1;
+        }
+
+        .todo-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 7px 8px;
+          border-radius: 7px;
+          transition: background 0.1s;
+          cursor: default;
+        }
+
+        .todo-item:hover { background: rgba(44,31,20,0.03); }
+
+        .todo-check {
+          width: 18px; height: 18px; min-width: 18px;
+          border-radius: 50%;
+          border: 1.5px solid rgba(44,31,20,0.25);
+          background: none;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.15s;
+          margin-top: 1px;
+          flex-shrink: 0;
+        }
+
+        .todo-check:hover { border-color: #C0733A; }
+
+        .todo-item.done .todo-check {
+          background: #C0733A;
+          border-color: #C0733A;
+        }
+
+        .todo-check-mark {
+          display: none;
+          color: #FFFBF7;
+          font-size: 10px;
+          font-weight: 700;
+          line-height: 1;
+        }
+
+        .todo-item.done .todo-check-mark { display: block; }
+
+        .todo-text {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          color: #2C1F14;
+          line-height: 1.45;
+          flex: 1;
+          cursor: text;
+          word-break: break-word;
+          transition: color 0.15s, opacity 0.15s;
+        }
+
+        .todo-item.done .todo-text {
+          color: rgba(44,31,20,0.3);
+          text-decoration: line-through;
+        }
+
+        .todo-text-input {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          color: #2C1F14;
+          background: #F5EEE6;
+          border: 1px solid #C0733A;
+          border-radius: 5px;
+          padding: 3px 6px;
+          width: 100%;
+          outline: none;
+          line-height: 1.45;
+          resize: none;
+        }
+
+        .todo-delete {
+          background: none; border: none;
+          color: rgba(44,31,20,0.15);
+          font-size: 16px; cursor: pointer;
+          padding: 0; line-height: 1;
+          opacity: 0;
+          transition: color 0.1s, opacity 0.1s;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .todo-item:hover .todo-delete { opacity: 1; }
+        .todo-delete:hover { color: #C0392B !important; }
+
+        .todo-add-row {
+          margin-top: 10px;
+        }
+
+        .todo-add-input {
+          width: 100%;
+          background: none;
+          border: none;
+          border-bottom: 1px solid rgba(44,31,20,0.12);
+          padding: 7px 0;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          color: #2C1F14;
+          outline: none;
+          transition: border-color 0.15s;
+        }
+
+        .todo-add-input:focus { border-bottom-color: #C0733A; }
+        .todo-add-input::placeholder { color: rgba(44,31,20,0.28); }
+
+        @media (max-width: 768px) {
+          .day-body { flex-direction: column; }
+          .todo-panel {
+            width: 100%; min-width: 0;
+            border-left: none;
+            border-top: 1px solid rgba(44,31,20,0.08);
+            position: static;
+            max-height: none;
+            min-height: auto;
+          }
         }
 
         /* Merged blocks */
@@ -1568,6 +1803,7 @@ export default function LifestylePlan() {
             </Suspense>
           ) : null}
 
+          <div className="day-body">
           <div className="planner-time-grid" ref={gridRef} style={{display: dayTab === "map" ? "none" : undefined}}>
             {showBlockForm && (
               <div className="block-form-bar">
@@ -1681,8 +1917,8 @@ export default function LifestylePlan() {
 
               return [
                 { label: "Morning",   hours: HOURS.filter(h => h < 12) },
-                { label: "Afternoon", hours: HOURS.filter(h => h >= 12 && h < 18) },
-                { label: "Evening",   hours: HOURS.filter(h => h >= 18) },
+                { label: "Afternoon", hours: HOURS.filter(h => h >= 12 && h < 20) },
+                { label: "Evening",   hours: HOURS.filter(h => h >= 20) },
               ].map(({ label, hours }) => {
                 // Skip section entirely if all hours are covered (not a block start)
                 const hasVisible = hours.some(h => blockByStart[h] || !coveredHours.has(h));
@@ -1799,6 +2035,57 @@ export default function LifestylePlan() {
                 );
               });
             })()}
+          </div>
+
+          {dayTab !== "map" && (
+            <div className="todo-panel">
+              <div className="todo-panel-title">To-Do · {todos.length > 0 ? `${doneTodos}/${todos.length}` : "0"}</div>
+              <div className="todo-progress-bar">
+                <div className="todo-progress-fill" style={{ width: todos.length ? `${Math.round(doneTodos / todos.length * 100)}%` : "0%" }} />
+              </div>
+              <div className="todo-list">
+                {todos.map(todo => (
+                  <div key={todo.id} className={`todo-item${todo.done ? " done" : ""}`}>
+                    <button className="todo-check" onClick={() => toggleTodo(todo.id, !todo.done)}>
+                      <span className="todo-check-mark">✓</span>
+                    </button>
+                    {todoEditing === todo.id ? (
+                      <input
+                        autoFocus
+                        className="todo-text-input"
+                        value={todoEditValue}
+                        onChange={e => setTodoEditValue(e.target.value)}
+                        onBlur={() => { renameTodo(todo.id, todoEditValue); setTodoEditing(null); }}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") { renameTodo(todo.id, todoEditValue); setTodoEditing(null); }
+                          if (e.key === "Escape") setTodoEditing(null);
+                        }}
+                      />
+                    ) : (
+                      <span className="todo-text" onDoubleClick={() => { setTodoEditing(todo.id); setTodoEditValue(todo.text); }}>
+                        {todo.text}
+                      </span>
+                    )}
+                    <button className="todo-delete" onMouseDown={e => { e.preventDefault(); deleteTodo(todo.id); }}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="todo-add-row">
+                <input
+                  className="todo-add-input"
+                  placeholder="+ Add a to-do…"
+                  value={todoInput}
+                  onChange={e => setTodoInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && todoInput.trim()) {
+                      addTodo(todoInput);
+                      setTodoInput("");
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
           </div>
         </div>
       )}
