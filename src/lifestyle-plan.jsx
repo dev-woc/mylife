@@ -809,7 +809,8 @@ export default function LifestylePlan() {
         }
 
         .task-chip-text {
-          line-height: 1.4;
+          line-height: 1.5;
+          white-space: pre-wrap;
         }
 
         .task-chip-delete {
@@ -854,8 +855,12 @@ export default function LifestylePlan() {
           font-size: 13px;
           outline: none;
           padding: 4px 8px;
-          width: 200px;
+          width: 220px;
+          min-height: 28px;
           border-radius: 0;
+          resize: none;
+          overflow: hidden;
+          line-height: 1.5;
         }
 
         /* Calendar */
@@ -1163,14 +1168,15 @@ export default function LifestylePlan() {
 
                       if (isEditing) {
                         return (
-                          <input
+                          <textarea
                             key={idx}
                             autoFocus
                             className="task-inline-input"
                             value={editingValue}
+                            rows={editingValue.split("\n").length || 1}
                             onChange={e => setEditingValue(e.target.value)}
                             onKeyDown={e => {
-                              if (e.key === "Enter") commitEdit();
+                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); }
                               if (e.key === "Escape") { setEditingSlot(null); setEditingValue(""); }
                             }}
                             onBlur={commitEdit}
@@ -1204,17 +1210,18 @@ export default function LifestylePlan() {
                     })}
 
                     {isAdding ? (
-                      <input
+                      <textarea
                         autoFocus
                         className="task-inline-input"
                         value={addingValue}
+                        rows={addingValue.split("\n").length || 1}
                         onChange={e => setAddingValue(e.target.value)}
                         onKeyDown={e => {
-                          if (e.key === "Enter") commitAdd();
+                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitAdd(); }
                           if (e.key === "Escape") { setAddingSlot(null); setAddingValue(""); }
                         }}
                         onBlur={commitAdd}
-                        placeholder="Add task..."
+                        placeholder="Add task... (Shift+Enter for new line)"
                       />
                     ) : (
                       <button
