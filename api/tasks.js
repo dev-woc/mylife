@@ -20,11 +20,12 @@ export default async function handler(req, res) {
       : await sql`SELECT date::text, hour, tasks FROM day_tasks ORDER BY date, hour`;
 
     // Shape into { [date]: { [hour]: string[] } }
+    // Parse hour to Number so keys like "9.0" normalise to "9" on the client
     const result = {};
     for (const row of rows) {
       const d = date || row.date;
       if (!result[d]) result[d] = {};
-      result[d][row.hour] = row.tasks;
+      result[d][Number(row.hour)] = row.tasks;
     }
     return res.status(200).json(result);
   }
