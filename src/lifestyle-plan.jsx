@@ -212,6 +212,13 @@ export default function LifestylePlan() {
       } else {
         setActive(null);
       }
+      return {
+        profile: profileData.profile || null,
+        onboarding: onboardingData,
+        monthlyPlans: Array.isArray(monthlyPlanData.months) ? monthlyPlanData.months : [],
+        planCycle: monthlyPlanData.cycle || null,
+        habitTemplates: Array.isArray(habitTemplateData.habits) ? habitTemplateData.habits : [],
+      };
     } finally {
       setPlanLoading(false);
     }
@@ -431,8 +438,15 @@ export default function LifestylePlan() {
       const planData = await planRes.json().catch(() => ({}));
       if (!planRes.ok) throw new Error(planData.error || "Failed to generate plan");
 
+      setProfile(profileData.profile || null);
+      setMonthlyPlans(Array.isArray(planData.months) ? planData.months : []);
+      setActive(Array.isArray(planData.months) && planData.months.length ? planData.months[0].id : null);
       setShowOnboarding(false);
-      await refreshPlannerContext();
+      try {
+        await refreshPlannerContext();
+      } catch {
+        // Keep the generated plan visible even if the follow-up refresh fails.
+      }
     } catch (error) {
       setOnboardingError(error.message);
     } finally {
