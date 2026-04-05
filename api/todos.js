@@ -1,11 +1,15 @@
-import { neon } from "@neondatabase/serverless";
-const sql = neon(process.env.DATABASE_URL);
+import { requireUser } from "./_lib/auth.js";
+import { createId, ensurePlannerSchema, sql } from "./_lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(204).end();
+
+  await ensurePlannerSchema();
+  const user = await requireUser(req, res);
+  if (!user) return;
 
   // GET /api/todos?date=YYYY-MM-DD  → todos for one day
   // GET /api/todos?month=YYYY-MM   → { [date]: todo[] } for whole month
@@ -14,7 +18,9 @@ export default async function handler(req, res) {
     if (month) {
       const rows = await sql`
         SELECT date::text, id, text, done, position, start_hour, end_hour, block_id
-        FROM day_todos WHERE to_char(date, 'YYYY-MM') = ${month} ORDER BY date, position, id
+        FROM planner_day_todos
+        WHERE user_id = ${user.id} AND to_char(date, 'YYYY-MM') = ${month}
+        ORDER BY date, position, id
       `;
       const result = {};
       for (const row of rows) {
@@ -26,7 +32,9 @@ export default async function handler(req, res) {
     if (!date) return res.status(400).json({ error: "date or month required" });
     const rows = await sql`
       SELECT id, text, done, position, start_hour, end_hour, block_id
-      FROM day_todos WHERE date = ${date} ORDER BY position, id
+      FROM planner_day_todos
+      WHERE user_id = ${user.id} AND date = ${date}
+      ORDER BY position, id
     `;
     return res.status(200).json(rows);
   }
@@ -35,10 +43,15 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     const { date, text, start_hour = null, end_hour = null, block_id = null } = req.body;
     if (!date || !text) return res.status(400).json({ error: "date and text required" });
-    const [{ max }] = await sql`SELECT COALESCE(MAX(position), 0) AS max FROM day_todos WHERE date = ${date}`;
+    const [{ max }] = await sql`
+      SELECT COALESCE(MAX(position), 0) AS max
+      FROM planner_day_todos
+      WHERE user_id = ${user.id} AND date = ${date}
+    `;
+    const id = createId();
     const [row] = await sql`
-      INSERT INTO day_todos (date, text, done, position, start_hour, end_hour, block_id)
-      VALUES (${date}, ${text}, false, ${Number(max) + 1}, ${start_hour}, ${end_hour}, ${block_id})
+      INSERT INTO planner_day_todos (id, user_id, date, text, done, position, start_hour, end_hour, block_id)
+      VALUES (${id}, ${user.id}, ${date}, ${text}, false, ${Number(max) + 1}, ${start_hour}, ${end_hour}, ${block_id})
       RETURNING id, text, done, position, start_hour, end_hour, block_id
     `;
     return res.status(201).json(row);
@@ -48,11 +61,11 @@ export default async function handler(req, res) {
   if (req.method === "PATCH") {
     const { id, done, text, start_hour, end_hour, block_id } = req.body;
     if (!id) return res.status(400).json({ error: "id required" });
-    if (done !== undefined) await sql`UPDATE day_todos SET done = ${done} WHERE id = ${id}`;
-    if (text !== undefined) await sql`UPDATE day_todos SET text = ${text} WHERE id = ${id}`;
-    if (start_hour !== undefined) await sql`UPDATE day_todos SET start_hour = ${start_hour} WHERE id = ${id}`;
-    if (end_hour !== undefined) await sql`UPDATE day_todos SET end_hour = ${end_hour} WHERE id = ${id}`;
-    if (block_id !== undefined) await sql`UPDATE day_todos SET block_id = ${block_id} WHERE id = ${id}`;
+    if (done !== undefined) await sql`UPDATE planner_day_todos SET done = ${done}, updated_at = NOW() WHERE id = ${id} AND user_id = ${user.id}`;
+    if (text !== undefined) await sql`UPDATE planner_day_todos SET text = ${text}, updated_at = NOW() WHERE id = ${id} AND user_id = ${user.id}`;
+    if (start_hour !== undefined) await sql`UPDATE planner_day_todos SET start_hour = ${start_hour}, updated_at = NOW() WHERE id = ${id} AND user_id = ${user.id}`;
+    if (end_hour !== undefined) await sql`UPDATE planner_day_todos SET end_hour = ${end_hour}, updated_at = NOW() WHERE id = ${id} AND user_id = ${user.id}`;
+    if (block_id !== undefined) await sql`UPDATE planner_day_todos SET block_id = ${block_id}, updated_at = NOW() WHERE id = ${id} AND user_id = ${user.id}`;
     return res.status(200).json({ ok: true });
   }
 
@@ -60,7 +73,7 @@ export default async function handler(req, res) {
   if (req.method === "DELETE") {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "id required" });
-    await sql`DELETE FROM day_todos WHERE id = ${id}`;
+    await sql`DELETE FROM planner_day_todos WHERE id = ${id} AND user_id = ${user.id}`;
     return res.status(200).json({ ok: true });
   }
 

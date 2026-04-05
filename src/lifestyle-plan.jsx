@@ -209,16 +209,22 @@ function formatDateLabel(iso) {
   });
 }
 
-function loadCache() {
+function cacheKey(userId) {
+  return `dayplanner-tasks:${userId}`;
+}
+
+function loadCache(userId) {
+  if (!userId) return {};
   try {
-    return JSON.parse(localStorage.getItem("dayplanner-tasks")) || {};
+    return JSON.parse(localStorage.getItem(cacheKey(userId))) || {};
   } catch {
     return {};
   }
 }
 
-function saveCache(data) {
-  localStorage.setItem("dayplanner-tasks", JSON.stringify(data));
+function saveCache(userId, data) {
+  if (!userId) return;
+  localStorage.setItem(cacheKey(userId), JSON.stringify(data));
 }
 
 async function fetchDayFromDB(date) {
@@ -256,6 +262,12 @@ const MONTH_NAMES = ["January","February","March","April","May","June","July","A
 export default function LifestylePlan() {
   const [view, setView] = useState("plan");
   const [active, setActive] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState("login");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authForm, setAuthForm] = useState({ username: "", password: "" });
 
   // Day planner state
   const today = todayISO();
@@ -264,7 +276,7 @@ export default function LifestylePlan() {
   const [dayTab, setDayTab] = useState("schedule"); // "schedule" | "map"
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
-  const [tasks, setTasks] = useState(loadCache);
+  const [tasks, setTasks] = useState({});
   const [syncing, setSyncing] = useState(false);
   const [addingSlot, setAddingSlot] = useState(null);
   const [addingValue, setAddingValue] = useState("");
@@ -307,8 +319,28 @@ export default function LifestylePlan() {
 
   const gridRef = useRef(null);
 
+  useEffect(() => {
+    fetch("/api/auth")
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({ user: null }));
+        if (!res.ok) throw new Error(data.error || "Failed to load account");
+        setAuthUser(data.user || null);
+      })
+      .catch(() => setAuthUser(null))
+      .finally(() => setAuthLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) {
+      setTasks({});
+      return;
+    }
+    setTasks(loadCache(authUser.id));
+  }, [authUser]);
+
   // Reset + reload day data when date changes
   useEffect(() => {
+    if (!authUser) return;
     setDayTab("schedule");
     setBlocks([]);
     setDayStops([]);
@@ -334,23 +366,23 @@ export default function LifestylePlan() {
       .then(r => r.json()).then(d => setTaskLinks(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/todos?date=${plannerDate}`)
       .then(r => r.json()).then(d => setTodos(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [plannerDate]);
+  }, [authUser, plannerDate]);
 
   // Load from DB when entering day view
   useEffect(() => {
-    if (view !== "planner" || plannerMode !== "day") return;
+    if (!authUser || view !== "planner" || plannerMode !== "day") return;
     setSyncing(true);
     fetchDayFromDB(plannerDate).then((dayData) => {
       if (dayData) {
         setTasks((prev) => {
           const merged = { ...prev, [plannerDate]: dayData };
-          saveCache(merged);
+          saveCache(authUser.id, merged);
           return merged;
         });
       }
       setSyncing(false);
     }).catch(() => setSyncing(false));
-  }, [plannerDate, plannerMode, view]);
+  }, [authUser, plannerDate, plannerMode, view]);
 
   useEffect(() => {
     if (plannerMode === "day" && gridRef.current) {
@@ -361,7 +393,7 @@ export default function LifestylePlan() {
 
   // Prefetch all tasks + todos for the visible calendar month so hover previews have data
   useEffect(() => {
-    if (view !== "planner" || plannerMode !== "calendar") return;
+    if (!authUser || view !== "planner" || plannerMode !== "calendar") return;
     const monthStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}`;
     fetch(`/api/tasks?month=${monthStr}`)
       .then(r => r.json())
@@ -369,7 +401,7 @@ export default function LifestylePlan() {
         if (typeof data !== "object" || Array.isArray(data)) return;
         setTasks(prev => {
           const merged = { ...prev, ...data };
-          saveCache(merged);
+          saveCache(authUser.id, merged);
           return merged;
         });
       })
@@ -381,14 +413,56 @@ export default function LifestylePlan() {
         setCalMonthTodos(data);
       })
       .catch(() => {});
-  }, [calYear, calMonth, plannerMode, view]);
+  }, [authUser, calYear, calMonth, plannerMode, view]);
 
   const selected = months.find((m) => m.id === active);
+
+  async function submitAuth(action) {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          username: authForm.username.trim().toLowerCase(),
+          password: authForm.password,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Authentication failed");
+      setAuthUser(data.user || null);
+      setAuthForm({ username: "", password: "" });
+    } catch (error) {
+      setAuthError(error.message);
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "logout" }),
+    }).catch(() => {});
+    setAuthUser(null);
+    setTasks({});
+    setTodos([]);
+    setBlocks([]);
+    setDayStops([]);
+    setTaskLinks([]);
+    setHabits([]);
+    setNoteText("");
+    setCalMonthTodos({});
+    setAuthError("");
+  }
 
   // Update local state + cache, then persist the changed slot to DB
   function saveTasks(updated, date, hour, slotTasks) {
     setTasks(updated);
-    saveCache(updated);
+    saveCache(authUser?.id, updated);
     persistSlotToDB(date, hour, slotTasks);
   }
 
@@ -710,6 +784,183 @@ export default function LifestylePlan() {
     noteSaveTimer.current = setTimeout(() => {
       fetch("/api/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: plannerDate, text }) }).catch(() => {});
     }, 800);
+  }
+
+  if (authLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #0A0A0F 0%, #171723 100%)",
+        color: "#F0EDE6",
+        fontFamily: "'DM Sans', sans-serif",
+        letterSpacing: "0.18em",
+        textTransform: "uppercase",
+        fontSize: 11,
+      }}>
+        Loading account…
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "radial-gradient(circle at top, rgba(255,215,0,0.16), transparent 34%), linear-gradient(160deg, #09090D 0%, #14141F 52%, #0B0B10 100%)",
+        color: "#F0EDE6",
+        padding: "32px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'DM Sans', sans-serif",
+      }}>
+        <div style={{
+          width: "100%",
+          maxWidth: 960,
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, 420px)",
+          gap: 24,
+          alignItems: "stretch",
+        }}>
+          <div style={{
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.03)",
+            padding: "40px",
+            backdropFilter: "blur(12px)",
+          }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(240,237,230,0.45)", marginBottom: 18 }}>
+              Personal Planner
+            </div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(42px, 8vw, 76px)", lineHeight: 0.95, fontWeight: 900 }}>
+              Separate <span style={{ color: "#FFD700" }}>accounts</span>, separate lives.
+            </div>
+            <div style={{ marginTop: 18, maxWidth: 520, fontSize: 15, lineHeight: 1.7, color: "rgba(240,237,230,0.68)" }}>
+              Create a username and password to keep each planner isolated. Tasks, blocks, todos, notes, habits, and map stops now live inside the signed-in account.
+            </div>
+          </div>
+
+          <div style={{
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "#F5EEE6",
+            color: "#2C1F14",
+            padding: "32px 28px",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.28)",
+          }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+              <button
+                onClick={() => { setAuthMode("login"); setAuthError(""); }}
+                style={{
+                  flex: 1,
+                  border: authMode === "login" ? "1px solid #2C1F14" : "1px solid rgba(44,31,20,0.12)",
+                  background: authMode === "login" ? "#2C1F14" : "transparent",
+                  color: authMode === "login" ? "#F5EEE6" : "rgba(44,31,20,0.65)",
+                  padding: "10px 12px",
+                  fontSize: 11,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => { setAuthMode("register"); setAuthError(""); }}
+                style={{
+                  flex: 1,
+                  border: authMode === "register" ? "1px solid #2C1F14" : "1px solid rgba(44,31,20,0.12)",
+                  background: authMode === "register" ? "#2C1F14" : "transparent",
+                  color: authMode === "register" ? "#F5EEE6" : "rgba(44,31,20,0.65)",
+                  padding: "10px 12px",
+                  fontSize: 11,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                Create Account
+              </button>
+            </div>
+
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 34, lineHeight: 1, marginBottom: 10 }}>
+              {authMode === "login" ? "Welcome back" : "Claim a planner"}
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, color: "rgba(44,31,20,0.6)", marginBottom: 18 }}>
+              {authMode === "login"
+                ? "Sign in with your username and password."
+                : "Use a simple username and a password with at least 8 characters."}
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); submitAuth(authMode); }}>
+              <label style={{ display: "block", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(44,31,20,0.45)", marginBottom: 6 }}>
+                Username
+              </label>
+              <input
+                autoFocus
+                value={authForm.username}
+                onChange={(e) => setAuthForm((prev) => ({ ...prev, username: e.target.value }))}
+                placeholder="jordan"
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(44,31,20,0.15)",
+                  background: "#FFFBF7",
+                  padding: "12px 14px",
+                  marginBottom: 14,
+                  fontSize: 15,
+                  outline: "none",
+                }}
+              />
+
+              <label style={{ display: "block", fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(44,31,20,0.45)", marginBottom: 6 }}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={authForm.password}
+                onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
+                placeholder="At least 8 characters"
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(44,31,20,0.15)",
+                  background: "#FFFBF7",
+                  padding: "12px 14px",
+                  marginBottom: 12,
+                  fontSize: 15,
+                  outline: "none",
+                }}
+              />
+
+              {authError ? (
+                <div style={{ marginBottom: 12, color: "#A33D2D", fontSize: 13, lineHeight: 1.5 }}>
+                  {authError}
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={authBusy || !authForm.username.trim() || !authForm.password}
+                style={{
+                  width: "100%",
+                  border: "none",
+                  background: "#2C1F14",
+                  color: "#F5EEE6",
+                  padding: "13px 16px",
+                  fontSize: 11,
+                  letterSpacing: "0.22em",
+                  textTransform: "uppercase",
+                  cursor: authBusy ? "default" : "pointer",
+                  opacity: authBusy ? 0.7 : 1,
+                }}
+              >
+                {authBusy ? "Working…" : authMode === "login" ? "Sign In" : "Create Account"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const dayTasks = tasks[plannerDate] || {};
@@ -2048,9 +2299,40 @@ export default function LifestylePlan() {
       `}</style>
 
       <div className="plan-header">
-        <div className="plan-eyebrow">Jay · Boston Era · 2026–2027</div>
-        <div className="plan-title">Life <span>Unlocked</span></div>
-        <div className="plan-subtitle">A 12-month vision for the man building and living at the same time</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <div className="plan-eyebrow">Jay · Boston Era · 2026–2027</div>
+            <div className="plan-title">Life <span>Unlocked</span></div>
+            <div className="plan-subtitle">A 12-month vision for the man building and living at the same time</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+            <div style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 10,
+              letterSpacing: 2.4,
+              textTransform: "uppercase",
+              color: "rgba(240,237,230,0.42)",
+            }}>
+              @{authUser.username}
+            </div>
+            <button
+              onClick={logout}
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.12)",
+                color: "rgba(240,237,230,0.72)",
+                padding: "10px 12px",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 10,
+                letterSpacing: 2.2,
+                textTransform: "uppercase",
+                cursor: "pointer",
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="nav-tabs">
@@ -2386,7 +2668,7 @@ export default function LifestylePlan() {
                         {isLinkingThis ? (
                           <select className="task-stop-select" autoFocus
                             onBlur={() => setLinkingTask(null)}
-                            onChange={e => { if (e.target.value) { linkTask(null, blockId, task, +e.target.value); setLinkingTask(null); } }}
+                            onChange={e => { if (e.target.value) { linkTask(null, blockId, task, e.target.value); setLinkingTask(null); } }}
                             onMouseDown={e => e.stopPropagation()}
                           >
                             <option value="">Link to stop…</option>
@@ -2504,7 +2786,7 @@ export default function LifestylePlan() {
                                 {isLinkingThis ? (
                                   <select className="task-stop-select" autoFocus
                                     onBlur={() => setLinkingTask(null)}
-                                    onChange={e => { if (e.target.value) { linkTask(hour, null, task, +e.target.value); setLinkingTask(null); } }}
+                                    onChange={e => { if (e.target.value) { linkTask(hour, null, task, e.target.value); setLinkingTask(null); } }}
                                     onMouseDown={e => e.stopPropagation()}
                                   >
                                     <option value="">Link to stop…</option>

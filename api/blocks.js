@@ -1,5 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-const sql = neon(process.env.DATABASE_URL);
+import { requireUser } from "./_lib/auth.js";
+import { createId, ensurePlannerSchema, sql } from "./_lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -7,13 +7,17 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(204).end();
 
+  await ensurePlannerSchema();
+  const user = await requireUser(req, res);
+  if (!user) return;
+
   // GET /api/blocks?date=YYYY-MM-DD
   if (req.method === "GET") {
     const { date } = req.query;
     if (!date) return res.status(400).json({ error: "date required" });
     const rows = await sql`
       SELECT id, start_hour, end_hour, label, tasks
-      FROM day_blocks WHERE date = ${date}
+      FROM planner_day_blocks WHERE user_id = ${user.id} AND date = ${date}
       ORDER BY start_hour
     `;
     return res.status(200).json(rows);
@@ -23,9 +27,10 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     const { date, start_hour, end_hour, label } = req.body;
     if (!date || start_hour == null || end_hour == null) return res.status(400).json({ error: "date, start_hour, end_hour required" });
+    const id = createId();
     const [row] = await sql`
-      INSERT INTO day_blocks (date, start_hour, end_hour, label)
-      VALUES (${date}, ${start_hour}, ${end_hour}, ${label || ""})
+      INSERT INTO planner_day_blocks (id, user_id, date, start_hour, end_hour, label)
+      VALUES (${id}, ${user.id}, ${date}, ${start_hour}, ${end_hour}, ${label || ""})
       RETURNING id, start_hour, end_hour, label, tasks
     `;
     return res.status(201).json(row);
@@ -35,7 +40,11 @@ export default async function handler(req, res) {
   if (req.method === "PATCH") {
     const { id, tasks } = req.body;
     if (!id || !Array.isArray(tasks)) return res.status(400).json({ error: "id and tasks required" });
-    await sql`UPDATE day_blocks SET tasks = ${tasks}, updated_at = NOW() WHERE id = ${id}`;
+    await sql`
+      UPDATE planner_day_blocks
+      SET tasks = ${tasks}, updated_at = NOW()
+      WHERE id = ${id} AND user_id = ${user.id}
+    `;
     return res.status(200).json({ ok: true });
   }
 
@@ -43,7 +52,7 @@ export default async function handler(req, res) {
   if (req.method === "DELETE") {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "id required" });
-    await sql`DELETE FROM day_blocks WHERE id = ${id}`;
+    await sql`DELETE FROM planner_day_blocks WHERE id = ${id} AND user_id = ${user.id}`;
     return res.status(200).json({ ok: true });
   }
 

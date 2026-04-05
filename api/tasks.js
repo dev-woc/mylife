@@ -1,6 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL);
+import { requireUser } from "./_lib/auth.js";
+import { ensurePlannerSchema, sql } from "./_lib/db.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -11,6 +10,10 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
+  await ensurePlannerSchema();
+  const user = await requireUser(req, res);
+  if (!user) return;
+
   // GET /api/tasks?date=YYYY-MM-DD  → hours for one date
   // GET /api/tasks?month=YYYY-MM   → all hours for every day in that month
   // GET /api/tasks                 → all rows
@@ -18,12 +21,26 @@ export default async function handler(req, res) {
     const { date, month } = req.query;
     let rows;
     if (date) {
-      rows = await sql`SELECT hour, tasks FROM day_tasks WHERE date = ${date} ORDER BY hour`;
+      rows = await sql`
+        SELECT date::text, hour, tasks
+        FROM planner_day_tasks
+        WHERE user_id = ${user.id} AND date = ${date}
+        ORDER BY hour
+      `;
     } else if (month) {
-      // month = "2026-04" → fetch 2026-04-01 to 2026-04-30
-      rows = await sql`SELECT date::text, hour, tasks FROM day_tasks WHERE to_char(date, 'YYYY-MM') = ${month} ORDER BY date, hour`;
+      rows = await sql`
+        SELECT date::text, hour, tasks
+        FROM planner_day_tasks
+        WHERE user_id = ${user.id} AND to_char(date, 'YYYY-MM') = ${month}
+        ORDER BY date, hour
+      `;
     } else {
-      rows = await sql`SELECT date::text, hour, tasks FROM day_tasks ORDER BY date, hour`;
+      rows = await sql`
+        SELECT date::text, hour, tasks
+        FROM planner_day_tasks
+        WHERE user_id = ${user.id}
+        ORDER BY date, hour
+      `;
     }
 
     // Shape into { [date]: { [hour]: string[] } }
@@ -46,12 +63,12 @@ export default async function handler(req, res) {
     }
 
     if (tasks.length === 0) {
-      await sql`DELETE FROM day_tasks WHERE date = ${date} AND hour = ${hour}`;
+      await sql`DELETE FROM planner_day_tasks WHERE user_id = ${user.id} AND date = ${date} AND hour = ${hour}`;
     } else {
       await sql`
-        INSERT INTO day_tasks (date, hour, tasks, updated_at)
-        VALUES (${date}, ${hour}, ${tasks}, NOW())
-        ON CONFLICT (date, hour)
+        INSERT INTO planner_day_tasks (user_id, date, hour, tasks, updated_at)
+        VALUES (${user.id}, ${date}, ${hour}, ${tasks}, NOW())
+        ON CONFLICT (user_id, date, hour)
         DO UPDATE SET tasks = ${tasks}, updated_at = NOW()
       `;
     }
