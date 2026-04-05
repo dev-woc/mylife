@@ -126,6 +126,121 @@ export function ensurePlannerSchema() {
           PRIMARY KEY (user_id, date)
         )
       `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_profiles (
+          user_id TEXT PRIMARY KEY,
+          display_name TEXT NOT NULL DEFAULT '',
+          city TEXT NOT NULL DEFAULT '',
+          timezone TEXT NOT NULL DEFAULT '',
+          life_stage TEXT NOT NULL DEFAULT '',
+          work_style TEXT NOT NULL DEFAULT '',
+          planning_style TEXT NOT NULL DEFAULT '',
+          energy_pattern TEXT NOT NULL DEFAULT '',
+          budget_style TEXT NOT NULL DEFAULT '',
+          primary_focus TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_onboarding_answers (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          question_key TEXT NOT NULL,
+          answer_text TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE (user_id, question_key)
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_plan_cycles (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          horizon_type TEXT NOT NULL,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS planner_plan_cycles_user_status_idx ON planner_plan_cycles (user_id, status, start_date)`;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_monthly_plans (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          cycle_id TEXT NOT NULL,
+          month_key TEXT NOT NULL,
+          month_name TEXT NOT NULL,
+          year INTEGER NOT NULL,
+          phase TEXT NOT NULL DEFAULT '',
+          theme TEXT NOT NULL DEFAULT '',
+          vibe TEXT NOT NULL DEFAULT '',
+          milestone TEXT NOT NULL DEFAULT '',
+          travel TEXT NOT NULL DEFAULT '',
+          budget_level TEXT NOT NULL DEFAULT '$',
+          color TEXT NOT NULL DEFAULT '#FFD700',
+          position INTEGER NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE (user_id, month_key)
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_monthly_experiences (
+          id TEXT PRIMARY KEY,
+          monthly_plan_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          text TEXT NOT NULL,
+          position INTEGER NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS planner_monthly_experiences_plan_idx ON planner_monthly_experiences (monthly_plan_id, position)`;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_habit_templates (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          label TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'general',
+          default_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS planner_habit_templates_user_sort_idx ON planner_habit_templates (user_id, sort_order, created_at)`;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_agent_memory (
+          user_id TEXT PRIMARY KEY,
+          summary TEXT NOT NULL DEFAULT '',
+          preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+          constraints JSONB NOT NULL DEFAULT '{}'::jsonb,
+          signals JSONB NOT NULL DEFAULT '{}'::jsonb,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS planner_agent_runs (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          run_type TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'completed',
+          input_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+          output_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
     })();
   }
 

@@ -11,165 +11,6 @@ const DayMap = lazy(() =>
   })
 );
 
-const months = [
-  {
-    id: 1,
-    month: "April",
-    year: "2026",
-    phase: "ARRIVAL",
-    theme: "Plant the Flag",
-    color: "#00E5FF",
-    budget: "$",
-    vibe: "Get your bearings. First week at Raytheon. Explore the block.",
-    experiences: ["First Boston weekend walk — Seaport, North End, Back Bay", "Find your spot in Lowell (food, coffee, late nights)", "Check out JOC Boxing or Lowell Boxing Club"],
-    travel: "No trips — bank every dollar. Boston is the trip.",
-    milestone: "Day 1 at Raytheon ✦ April 6",
-  },
-  {
-    id: 2,
-    month: "May",
-    year: "2026",
-    phase: "MOMENTUM",
-    theme: "Lock In",
-    color: "#ADFF2F",
-    budget: "$",
-    vibe: "Paycheck rhythm established. First full month in Massachusetts.",
-    experiences: ["Red Sox game at Fenway Park", "Boston Young Professionals event or networking mixer", "Day trip to Salem or Cape Ann"],
-    travel: "Salem or Gloucester — 45 min drive, full vibe.",
-    milestone: "First full paycheck month",
-  },
-  {
-    id: 3,
-    month: "June",
-    year: "2026",
-    phase: "INFLECTION",
-    theme: "Su Su Season",
-    color: "#FFD700",
-    budget: "$$$",
-    vibe: "Payout hits. This is the month you reward yourself intentionally.",
-    experiences: ["Concert — check Fenway, TD Garden, or Leader Bank Pavilion", "Upgrade your setup (apartment, gym membership, gear)", "Boston Calling or summer music festival"],
-    travel: "Weekend trip — NYC, Philly, or Montreal is close and worthy.",
-    milestone: "Su Su payout 💰 — first real discretionary stack",
-  },
-  {
-    id: 4,
-    month: "July",
-    year: "2026",
-    phase: "SUMMER",
-    theme: "Peak New England",
-    color: "#FF6B35",
-    budget: "$$",
-    vibe: "Boston in July is underrated. Water, cookouts, outdoor everything.",
-    experiences: ["4th of July on the Esplanade — Boston Pops Fireworks", "Cape Cod beach weekend", "Rooftop bars in Boston"],
-    travel: "Cape Cod — 1.5 hrs, rent a cottage with people from work or new friends.",
-    milestone: "3 months in Boston ✦ Social network building",
-  },
-  {
-    id: 5,
-    month: "August",
-    year: "2026",
-    phase: "EXPLORE",
-    theme: "First Real Trip",
-    color: "#C77DFF",
-    budget: "$$$",
-    vibe: "You've been grinding. Fly somewhere. No excuses.",
-    experiences: ["International or domestic flight trip", "ODSC AI East — Boston (network + AI scene)", "Try a new cuisine city: Chicago, Atlanta, Toronto"],
-    travel: "✈️ Fly out — Chicago, Atlanta, Toronto, or Cancun. Budget $800–1200.",
-    milestone: "First solo trip as a Boston resident",
-  },
-  {
-    id: 6,
-    month: "September",
-    year: "2026",
-    phase: "FALL WAVE",
-    theme: "New England Fall",
-    color: "#FF4E50",
-    budget: "$$",
-    vibe: "The best season in New England. Take full advantage.",
-    experiences: ["Foliage road trip — White Mountains NH or Vermont", "Patriots season opener — watch party or live", "Boston food festival or outdoor markets"],
-    travel: "Vermont or NH — 2 hr drive. One of the most beautiful things you'll ever see.",
-    milestone: "5 months settled — apartment hunt gets serious",
-  },
-  {
-    id: 7,
-    month: "October",
-    year: "2026",
-    phase: "CULTURE",
-    theme: "City Mode",
-    color: "#00B4D8",
-    budget: "$$",
-    vibe: "Fall in full swing. Sports season. Halloween. Boston is alive.",
-    experiences: ["NBA opening night — Celtics at TD Garden", "Salem Halloween — it's iconic, do it", "Concert season peaks — check touring artists"],
-    travel: "Salem Halloween weekend — 30 min from Tewksbury, legendary experience.",
-    milestone: "6 months at Raytheon ✦ Performance review season",
-  },
-  {
-    id: 8,
-    month: "November",
-    year: "2026",
-    phase: "GRATEFUL",
-    theme: "Give Thanks",
-    color: "#F4A261",
-    budget: "$$",
-    vibe: "Thanksgiving — go home or host. Either way, you've earned a flex.",
-    experiences: ["Celtics or Bruins home game", "Art and culture — ICA Boston, MFA", "Cook a real meal for people you've met"],
-    travel: "Orlando trip — visit family, show the glow-up.",
-    milestone: "First Thanksgiving away from Florida",
-  },
-  {
-    id: 9,
-    month: "December",
-    year: "2026",
-    phase: "LEVEL UP",
-    theme: "Year-End Review",
-    color: "#B5E48C",
-    budget: "$$$",
-    vibe: "Close the year strong. Reflect, reward, reset.",
-    experiences: ["Holiday pop-up bars and events in Boston", "New Year's Eve plan — Boston First Night or a trip", "Year-end financial review — track net worth delta"],
-    travel: "NYE trip — NYC, Miami, or a Airbnb house with people.",
-    milestone: "2026 closes — you built something real",
-  },
-  {
-    id: 10,
-    month: "January",
-    year: "2027",
-    phase: "RESET",
-    theme: "Go Somewhere Warm",
-    color: "#48CAE4",
-    budget: "$$$",
-    vibe: "New England winters are no joke. Fight back with a warm weather trip.",
-    experiences: ["Caribbean, Mexico, or Central America trip", "Set 2027 financial and career goals", "Find a Boston AI meetup to attend monthly"],
-    travel: "✈️ Dominican Republic, Jamaica, Puerto Rico, or Cancun — 4–5 day trip.",
-    milestone: "First international trip of 2027",
-  },
-  {
-    id: 11,
-    month: "February",
-    year: "2027",
-    phase: "GRIND",
-    theme: "Stay Sharp",
-    color: "#F72585",
-    budget: "$",
-    vibe: "Deep winter. Indoor mode. Channel it into skills and community.",
-    experiences: ["Black History Month events in Boston", "Celtics playoff push — TD Garden", "Level up an AI project or side build"],
-    travel: "Short trip — Montreal or NYC for a weekend.",
-    milestone: "10 months at Raytheon — raise conversation territory",
-  },
-  {
-    id: 12,
-    month: "March",
-    year: "2027",
-    phase: "ONE YEAR",
-    theme: "Anniversary Month",
-    color: "#FFD700",
-    budget: "$$$",
-    vibe: "One year in Boston. You made it. Now it's time to expand the vision.",
-    experiences: ["Celebrate — dinner, trip, or experience that marks the milestone", "Start solo apartment search seriously", "Map out Year 2 with bigger goals"],
-    travel: "Reward trip — somewhere you've never been. You've earned it.",
-    milestone: "🎯 Year 1 complete. New chapter begins.",
-  },
-];
-
 const budgetDots = { "$": 1, "$$": 2, "$$$": 3 };
 
 // 30-min slots for 5–7am and 8–11pm; hourly otherwise
@@ -259,6 +100,14 @@ function buildCalendarGrid(year, month) {
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
+function chunkItems(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 export default function LifestylePlan() {
   const [view, setView] = useState("plan");
   const [active, setActive] = useState(null);
@@ -268,6 +117,16 @@ export default function LifestylePlan() {
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [authForm, setAuthForm] = useState({ username: "", password: "" });
+  const [profile, setProfile] = useState(null);
+  const [monthlyPlans, setMonthlyPlans] = useState([]);
+  const [planCycle, setPlanCycle] = useState(null);
+  const [habitTemplates, setHabitTemplates] = useState([]);
+  const [onboardingQuestions, setOnboardingQuestions] = useState([]);
+  const [onboardingAnswers, setOnboardingAnswers] = useState({});
+  const [planLoading, setPlanLoading] = useState(false);
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
+  const [onboardingError, setOnboardingError] = useState("");
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Day planner state
   const today = todayISO();
@@ -309,8 +168,6 @@ export default function LifestylePlan() {
   const [calHoverDay, setCalHoverDay] = useState(null);
   const [calMonthTodos, setCalMonthTodos] = useState({}); // { [date]: todo[] }
 
-  // Habits
-  const HABIT_DEFAULTS = ["Gym / Train", "Read", "Cook / Meal Prep", "No Junk Spend", "Network", "Journal"];
   const [habits, setHabits] = useState([]); // [{ label, done }]
 
   // Notes
@@ -318,6 +175,47 @@ export default function LifestylePlan() {
   const noteSaveTimer = useRef(null);
 
   const gridRef = useRef(null);
+
+  async function refreshPlannerContext() {
+    if (!authUser) return;
+    setPlanLoading(true);
+    try {
+      const [profileRes, onboardingRes, monthlyPlansRes, habitTemplatesRes] = await Promise.all([
+        fetch("/api/profile"),
+        fetch("/api/onboarding"),
+        fetch("/api/monthly-plans"),
+        fetch("/api/habit-templates"),
+      ]);
+
+      const [profileData, onboardingData, monthlyPlanData, habitTemplateData] = await Promise.all([
+        profileRes.json().catch(() => ({})),
+        onboardingRes.json().catch(() => ({})),
+        monthlyPlansRes.json().catch(() => ({})),
+        habitTemplatesRes.json().catch(() => ({})),
+      ]);
+
+      setProfile(profileData.profile || null);
+      setOnboardingQuestions(onboardingData.questions || []);
+      setOnboardingAnswers(onboardingData.answers || {});
+      setMonthlyPlans(Array.isArray(monthlyPlanData.months) ? monthlyPlanData.months : []);
+      setPlanCycle(monthlyPlanData.cycle || null);
+      setHabitTemplates(Array.isArray(habitTemplateData.habits) ? habitTemplateData.habits : []);
+
+      const hasPlan = Array.isArray(monthlyPlanData.months) && monthlyPlanData.months.length > 0;
+      setShowOnboarding(!(onboardingData.completed && hasPlan));
+      if (hasPlan) {
+        setActive((current) =>
+          current && monthlyPlanData.months.some((month) => month.id === current)
+            ? current
+            : monthlyPlanData.months[0].id
+        );
+      } else {
+        setActive(null);
+      }
+    } finally {
+      setPlanLoading(false);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/auth")
@@ -333,9 +231,20 @@ export default function LifestylePlan() {
   useEffect(() => {
     if (!authUser) {
       setTasks({});
+      setProfile(null);
+      setMonthlyPlans([]);
+      setPlanCycle(null);
+      setHabitTemplates([]);
+      setOnboardingQuestions([]);
+      setOnboardingAnswers({});
       return;
     }
     setTasks(loadCache(authUser.id));
+  }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    refreshPlannerContext();
   }, [authUser]);
 
   // Reset + reload day data when date changes
@@ -352,10 +261,19 @@ export default function LifestylePlan() {
     fetch(`/api/habits?date=${plannerDate}`)
       .then(r => r.json()).then(rows => {
         if (!Array.isArray(rows)) return;
-        // Merge DB state with defaults (defaults first, DB values override done)
         const dbMap = Object.fromEntries(rows.map(r => [r.label, r.done]));
-        setHabits(HABIT_DEFAULTS.map(label => ({ label, done: dbMap[label] ?? false })));
-      }).catch(() => setHabits(HABIT_DEFAULTS.map(label => ({ label, done: false }))));
+        const labels = habitTemplates
+          .filter((habit) => habit.default_enabled !== false)
+          .map((habit) => habit.label);
+        const mergedLabels = [...new Set([...labels, ...Object.keys(dbMap)])];
+        setHabits(mergedLabels.map(label => ({ label, done: dbMap[label] ?? false })));
+      }).catch(() => {
+        setHabits(
+          habitTemplates
+            .filter((habit) => habit.default_enabled !== false)
+            .map((habit) => ({ label: habit.label, done: false }))
+        );
+      });
     fetch(`/api/notes?date=${plannerDate}`)
       .then(r => r.json()).then(d => setNoteText(d.text ?? "")).catch(() => {});
     fetch(`/api/blocks?date=${plannerDate}`)
@@ -366,7 +284,7 @@ export default function LifestylePlan() {
       .then(r => r.json()).then(d => setTaskLinks(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/todos?date=${plannerDate}`)
       .then(r => r.json()).then(d => setTodos(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [authUser, plannerDate]);
+  }, [authUser, plannerDate, habitTemplates]);
 
   // Load from DB when entering day view
   useEffect(() => {
@@ -415,7 +333,7 @@ export default function LifestylePlan() {
       .catch(() => {});
   }, [authUser, calYear, calMonth, plannerMode, view]);
 
-  const selected = months.find((m) => m.id === active);
+  const selected = monthlyPlans.find((m) => m.id === active);
 
   async function submitAuth(action) {
     setAuthBusy(true);
@@ -456,7 +374,70 @@ export default function LifestylePlan() {
     setHabits([]);
     setNoteText("");
     setCalMonthTodos({});
+    setProfile(null);
+    setMonthlyPlans([]);
+    setPlanCycle(null);
+    setHabitTemplates([]);
+    setOnboardingQuestions([]);
+    setOnboardingAnswers({});
+    setShowOnboarding(false);
     setAuthError("");
+  }
+
+  async function submitOnboarding() {
+    setOnboardingBusy(true);
+    setOnboardingError("");
+    try {
+      const answersPayload = { ...onboardingAnswers };
+      const displayName = String(answersPayload.display_name || "").trim();
+      const city = String(answersPayload.city_context || "").trim();
+      const lifeStage = String(answersPayload.life_stage || "").trim();
+      const planningStyle = String(answersPayload.planning_style || "").trim();
+      const energyPattern = String(answersPayload.energy_pattern || "").trim();
+      const primaryFocus = String(answersPayload.top_goals || "")
+        .split(/\n|,|;/)
+        .map((part) => part.trim())
+        .find(Boolean) || "";
+
+      const profileRes = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: displayName,
+          city,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+          life_stage: lifeStage,
+          planning_style: planningStyle,
+          energy_pattern: energyPattern,
+          primary_focus: primaryFocus,
+        }),
+      });
+      const profileData = await profileRes.json().catch(() => ({}));
+      if (!profileRes.ok) throw new Error(profileData.error || "Failed to save profile");
+
+      const onboardingRes = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: answersPayload }),
+      });
+      const onboardingData = await onboardingRes.json().catch(() => ({}));
+      if (!onboardingRes.ok) throw new Error(onboardingData.error || "Failed to save onboarding");
+
+      const planRes = await fetch("/api/plan/generate-initial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ horizonType: "year" }),
+      });
+      const planData = await planRes.json().catch(() => ({}));
+      if (!planRes.ok) throw new Error(planData.error || "Failed to generate plan");
+
+      setShowOnboarding(false);
+      await refreshPlannerContext();
+    } catch (error) {
+      setOnboardingError(error.message);
+    } finally {
+      setOnboardingBusy(false);
+    }
   }
 
   // Update local state + cache, then persist the changed slot to DB
@@ -963,9 +944,123 @@ export default function LifestylePlan() {
     );
   }
 
+  if (showOnboarding) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #0A0A0F 0%, #14141F 52%, #0B0B10 100%)",
+        color: "#F0EDE6",
+        padding: "32px",
+        fontFamily: "'DM Sans', sans-serif",
+      }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1.1fr)", gap: 24 }}>
+          <div style={{ padding: "24px 8px 24px 0" }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(240,237,230,0.45)", marginBottom: 16 }}>
+              Shape the Planner
+            </div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(40px, 7vw, 72px)", lineHeight: 0.95, fontWeight: 900 }}>
+              Build a plan that fits <span style={{ color: "#FFD700" }}>{profile?.display_name || authUser.username}</span>.
+            </div>
+            <div style={{ marginTop: 18, maxWidth: 520, fontSize: 15, lineHeight: 1.7, color: "rgba(240,237,230,0.68)" }}>
+              Answer a few questions. The app will turn them into a first-year direction, monthly themes, and default habits you can keep refining later.
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
+              {monthlyPlans.length ? (
+                <button
+                  onClick={() => setShowOnboarding(false)}
+                  style={{
+                    background: "transparent",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "rgba(240,237,230,0.72)",
+                    padding: "10px 12px",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 10,
+                    letterSpacing: 2.2,
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                  }}
+                >
+                  Back to Plan
+                </button>
+              ) : null}
+              <button
+                onClick={logout}
+                style={{
+                  background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "rgba(240,237,230,0.72)",
+                  padding: "10px 12px",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 10,
+                  letterSpacing: 2.2,
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+
+          <div style={{ background: "#F5EEE6", color: "#2C1F14", padding: 28, boxShadow: "0 24px 80px rgba(0,0,0,0.28)" }}>
+            <div style={{ display: "grid", gap: 16 }}>
+              {onboardingQuestions.map((question) => (
+                <label key={question.key} style={{ display: "block" }}>
+                  <div style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(44,31,20,0.45)", marginBottom: 6 }}>
+                    {question.label}
+                  </div>
+                  <textarea
+                    value={onboardingAnswers[question.key] || ""}
+                    onChange={(e) => setOnboardingAnswers((prev) => ({ ...prev, [question.key]: e.target.value }))}
+                    placeholder={question.placeholder}
+                    rows={question.key === "top_goals" || question.key === "ideal_week" ? 3 : 2}
+                    style={{
+                      width: "100%",
+                      border: "1px solid rgba(44,31,20,0.12)",
+                      background: "#FFFBF7",
+                      padding: "12px 14px",
+                      fontSize: 14,
+                      resize: "vertical",
+                      outline: "none",
+                    }}
+                  />
+                </label>
+              ))}
+
+              {onboardingError ? (
+                <div style={{ color: "#A33D2D", fontSize: 13, lineHeight: 1.5 }}>
+                  {onboardingError}
+                </div>
+              ) : null}
+
+              <button
+                onClick={submitOnboarding}
+                disabled={onboardingBusy || onboardingQuestions.some((question) => !String(onboardingAnswers[question.key] || "").trim())}
+                style={{
+                  border: "none",
+                  background: "#2C1F14",
+                  color: "#F5EEE6",
+                  padding: "14px 16px",
+                  fontSize: 11,
+                  letterSpacing: "0.22em",
+                  textTransform: "uppercase",
+                  cursor: onboardingBusy ? "default" : "pointer",
+                  opacity: onboardingBusy ? 0.7 : 1,
+                }}
+              >
+                {onboardingBusy ? "Generating Plan…" : "Generate My Plan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const dayTasks = tasks[plannerDate] || {};
   const totalTaskCount = Object.values(dayTasks).reduce((sum, arr) => sum + arr.length, 0);
   const doneTodos = todos.filter(t => t.done).length;
+  const planGroups = chunkItems(monthlyPlans, 3);
 
   return (
     <div style={{
@@ -2301,9 +2396,13 @@ export default function LifestylePlan() {
       <div className="plan-header">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <div className="plan-eyebrow">Jay · Boston Era · 2026–2027</div>
+            <div className="plan-eyebrow">
+              {(profile?.display_name || authUser.username)} · {profile?.city || "Personal Planning"} · {planCycle?.title || "Adaptive Direction"}
+            </div>
             <div className="plan-title">Life <span>Unlocked</span></div>
-            <div className="plan-subtitle">A 12-month vision for the man building and living at the same time</div>
+            <div className="plan-subtitle">
+              {profile?.primary_focus || "A planner that adapts around your goals, energy, and real constraints."}
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
             <div style={{
@@ -2356,42 +2455,61 @@ export default function LifestylePlan() {
             <div className="legend-item"><div className="legend-dot" style={{background:"rgba(240,237,230,0.4)"}} />$ = Low spend month</div>
             <div className="legend-item"><div className="legend-dot" style={{background:"rgba(240,237,230,0.7)"}} />$$ = Moderate</div>
             <div className="legend-item"><div className="legend-dot" style={{background:"#FFD700"}} />$$$ = Investment month</div>
-            <div className="legend-item" style={{marginLeft:"auto", color:"rgba(240,237,230,0.25)"}}>Tap any month →</div>
+            <button
+              onClick={() => setShowOnboarding(true)}
+              style={{
+                marginLeft: "auto",
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "rgba(240,237,230,0.72)",
+                padding: "8px 10px",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 10,
+                letterSpacing: 2,
+                textTransform: "uppercase",
+                cursor: "pointer",
+              }}
+            >
+              Refine Inputs
+            </button>
+            <div className="legend-item" style={{ color:"rgba(240,237,230,0.25)" }}>
+              {planLoading ? "Refreshing plan…" : "Tap any month →"}
+            </div>
           </div>
 
-          {[
-            { label: "Q1 — April · May · June 2026", ids: [1,2,3] },
-            { label: "Q2 — July · August · September 2026", ids: [4,5,6] },
-            { label: "Q3 — October · November · December 2026", ids: [7,8,9] },
-            { label: "Q4 — January · February · March 2027", ids: [10,11,12] },
-          ].map(({ label, ids }) => (
-            <div key={label} className="quarter-block">
-              <div className="quarter-label">{label}</div>
-              <div className="months-grid">
-                {months.filter(m => ids.includes(m.id)).map((m) => {
-                  const dots = budgetDots[m.budget];
-                  return (
-                    <div
-                      key={m.id}
-                      className={`month-tile${active === m.id ? " active" : ""}`}
-                      style={{ "--accent": m.color }}
-                      onClick={() => setActive(active === m.id ? null : m.id)}
-                    >
-                      <div className="tile-phase">{m.phase}</div>
-                      <div className="tile-month">{m.month}</div>
-                      <div className="tile-year">{m.year}</div>
-                      <div className="tile-theme">{m.theme}</div>
-                      <div className="budget-dots">
-                        {[1,2,3].map(i => (
-                          <div key={i} className={`dot${i <= dots ? " filled" : ""}`} />
-                        ))}
+          {planGroups.map((group, index) => {
+            const label = group.length
+              ? `Q${index + 1} — ${group.map((month) => `${month.month} ${month.year}`).join(" · ")}`
+              : `Q${index + 1}`;
+            return (
+              <div key={label} className="quarter-block">
+                <div className="quarter-label">{label}</div>
+                <div className="months-grid">
+                  {group.map((monthPlan) => {
+                    const dots = budgetDots[monthPlan.budget] || 1;
+                    return (
+                      <div
+                        key={monthPlan.id}
+                        className={`month-tile${active === monthPlan.id ? " active" : ""}`}
+                        style={{ "--accent": monthPlan.color }}
+                        onClick={() => setActive(active === monthPlan.id ? null : monthPlan.id)}
+                      >
+                        <div className="tile-phase">{monthPlan.phase}</div>
+                        <div className="tile-month">{monthPlan.month}</div>
+                        <div className="tile-year">{monthPlan.year}</div>
+                        <div className="tile-theme">{monthPlan.theme}</div>
+                        <div className="budget-dots">
+                          {[1,2,3].map(i => (
+                            <div key={i} className={`dot${i <= dots ? " filled" : ""}`} />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {selected ? (
             <div className="detail-panel" style={{ "--accent": selected.color }}>
@@ -2423,7 +2541,9 @@ export default function LifestylePlan() {
               </div>
             </div>
           ) : (
-            <div className="empty-state">Select a month above to see the full breakdown.</div>
+            <div className="empty-state">
+              {monthlyPlans.length ? "Select a month above to see the full breakdown." : "Complete onboarding to generate your first monthly plan."}
+            </div>
           )}
         </>
       ) : plannerMode === "calendar" ? (
@@ -2513,7 +2633,7 @@ export default function LifestylePlan() {
             {(() => {
               const calMonthName = MONTH_NAMES[calMonth];
               const calYearStr = calYear.toString();
-              const mData = months.find(m => m.month === calMonthName && m.year === calYearStr);
+              const mData = monthlyPlans.find(m => m.month === calMonthName && m.year === calYearStr);
               if (!mData) return (
                 <div className="cal-milestone-panel">
                   <div className="cal-milestone-month" style={{ color: "rgba(240,237,230,0.3)" }}>
