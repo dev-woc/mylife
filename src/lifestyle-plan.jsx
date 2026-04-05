@@ -127,6 +127,7 @@ export default function LifestylePlan() {
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [plannerReady, setPlannerReady] = useState(false);
 
   // Day planner state
   const today = todayISO();
@@ -179,6 +180,7 @@ export default function LifestylePlan() {
   async function refreshPlannerContext() {
     if (!authUser) return;
     setPlanLoading(true);
+    setPlannerReady(false);
     try {
       const [profileRes, onboardingRes, monthlyPlansRes, habitTemplatesRes] = await Promise.all([
         fetch("/api/profile"),
@@ -221,6 +223,7 @@ export default function LifestylePlan() {
       };
     } finally {
       setPlanLoading(false);
+      setPlannerReady(true);
     }
   }
 
@@ -244,6 +247,7 @@ export default function LifestylePlan() {
       setHabitTemplates([]);
       setOnboardingQuestions([]);
       setOnboardingAnswers({});
+      setPlannerReady(false);
       return;
     }
     setTasks(loadCache(authUser.id));
@@ -256,7 +260,7 @@ export default function LifestylePlan() {
 
   // Reset + reload day data when date changes
   useEffect(() => {
-    if (!authUser) return;
+    if (!authUser || !plannerReady || showOnboarding) return;
     setDayTab("schedule");
     setBlocks([]);
     setDayStops([]);
@@ -291,11 +295,11 @@ export default function LifestylePlan() {
       .then(r => r.json()).then(d => setTaskLinks(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/todos?date=${plannerDate}`)
       .then(r => r.json()).then(d => setTodos(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [authUser, plannerDate, habitTemplates]);
+  }, [authUser, plannerDate, habitTemplates, showOnboarding, plannerReady]);
 
   // Load from DB when entering day view
   useEffect(() => {
-    if (!authUser || view !== "planner" || plannerMode !== "day") return;
+    if (!authUser || !plannerReady || showOnboarding || view !== "planner" || plannerMode !== "day") return;
     setSyncing(true);
     fetchDayFromDB(plannerDate).then((dayData) => {
       if (dayData) {
@@ -307,7 +311,7 @@ export default function LifestylePlan() {
       }
       setSyncing(false);
     }).catch(() => setSyncing(false));
-  }, [authUser, plannerDate, plannerMode, view]);
+  }, [authUser, plannerDate, plannerMode, view, showOnboarding, plannerReady]);
 
   useEffect(() => {
     if (plannerMode === "day" && gridRef.current) {
@@ -318,7 +322,7 @@ export default function LifestylePlan() {
 
   // Prefetch all tasks + todos for the visible calendar month so hover previews have data
   useEffect(() => {
-    if (!authUser || view !== "planner" || plannerMode !== "calendar") return;
+    if (!authUser || !plannerReady || showOnboarding || view !== "planner" || plannerMode !== "calendar") return;
     const monthStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}`;
     fetch(`/api/tasks?month=${monthStr}`)
       .then(r => r.json())
@@ -338,7 +342,7 @@ export default function LifestylePlan() {
         setCalMonthTodos(data);
       })
       .catch(() => {});
-  }, [authUser, calYear, calMonth, plannerMode, view]);
+  }, [authUser, calYear, calMonth, plannerMode, view, showOnboarding, plannerReady]);
 
   const selected = monthlyPlans.find((m) => m.id === active);
 
@@ -388,6 +392,7 @@ export default function LifestylePlan() {
     setOnboardingQuestions([]);
     setOnboardingAnswers({});
     setShowOnboarding(false);
+    setPlannerReady(false);
     setAuthError("");
   }
 
@@ -406,39 +411,36 @@ export default function LifestylePlan() {
         .map((part) => part.trim())
         .find(Boolean) || "";
 
-      const profileRes = await fetch("/api/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          display_name: displayName,
-          city,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
-          life_stage: lifeStage,
-          planning_style: planningStyle,
-          energy_pattern: energyPattern,
-          primary_focus: primaryFocus,
-        }),
-      });
-      const profileData = await profileRes.json().catch(() => ({}));
-      if (!profileRes.ok) throw new Error(profileData.error || "Failed to save profile");
-
-      const onboardingRes = await fetch("/api/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: answersPayload }),
-      });
-      const onboardingData = await onboardingRes.json().catch(() => ({}));
-      if (!onboardingRes.ok) throw new Error(onboardingData.error || "Failed to save onboarding");
-
       const planRes = await fetch("/api/plan/generate-initial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ horizonType: "year" }),
+        body: JSON.stringify({
+          horizonType: "year",
+          profile: {
+            display_name: displayName,
+            city,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+            life_stage: lifeStage,
+            planning_style: planningStyle,
+            energy_pattern: energyPattern,
+            primary_focus: primaryFocus,
+          },
+          answers: answersPayload,
+        }),
       });
       const planData = await planRes.json().catch(() => ({}));
       if (!planRes.ok) throw new Error(planData.error || "Failed to generate plan");
 
-      setProfile(profileData.profile || null);
+      setProfile((prev) => ({
+        ...(prev || {}),
+        display_name: displayName,
+        city,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+        life_stage: lifeStage,
+        planning_style: planningStyle,
+        energy_pattern: energyPattern,
+        primary_focus: primaryFocus,
+      }));
       setMonthlyPlans(Array.isArray(planData.months) ? planData.months : []);
       setActive(Array.isArray(planData.months) && planData.months.length ? planData.months[0].id : null);
       setShowOnboarding(false);
